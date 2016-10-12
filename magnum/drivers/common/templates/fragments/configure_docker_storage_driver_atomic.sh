@@ -15,10 +15,6 @@ configure_overlay () {
 
     rm -rf /var/lib/docker/*
 
-    mkfs.xfs -f ${device_path}
-    echo "${device_path} /var/lib/docker xfs defaults 0 0" >> /etc/fstab
-    mount -a
-
     echo "STORAGE_DRIVER=overlay" > /etc/sysconfig/docker-storage-setup
 
     # SELinux must be enabled and in enforcing mode on the physical
@@ -29,10 +25,5 @@ configure_overlay () {
 
 # Configure docker storage with devicemapper using direct LVM
 configure_devicemapper () {
-    clear_docker_storage_congiguration
-
-    pvcreate -f ${device_path}
-    vgcreate docker ${device_path}
-
-    echo "VG=docker" > /etc/sysconfig/docker-storage-setup
+  echo "devicemapper"
 }

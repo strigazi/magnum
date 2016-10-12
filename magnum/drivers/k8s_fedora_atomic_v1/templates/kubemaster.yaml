@@ -442,12 +442,12 @@ resources:
   #
 
   docker_volume:
-    type: OS::Cinder::Volume
+    type: OS::Heat::None
     properties:
       size: {get_param: docker_volume_size}
 
   docker_volume_attach:
-    type: OS::Cinder::VolumeAttachment
+    type: OS::Heat::None
     properties:
       instance_uuid: {get_resource: kube_master}
       volume_id: {get_resource: docker_volume}
