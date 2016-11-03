@@ -72,6 +72,9 @@ def validate_keypair(cli, keypair):
 
 def validate_external_network(cli, external_network):
     """Validate external network"""
+    # TODO(mvelten): hack to get this working with nova network
+    # replace with upstream solution later
+    return
 
     count = 0
     ext_filter = {'router:external': True}
