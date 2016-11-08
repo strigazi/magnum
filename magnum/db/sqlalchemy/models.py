@@ -24,6 +24,7 @@ from sqlalchemy import Boolean
 from sqlalchemy import Column
 from sqlalchemy import DateTime
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import schema
 from sqlalchemy import String
@@ -115,16 +116,11 @@ class Cluster(Base):
     uuid = Column(String(36))
     name = Column(String(255))
     cluster_template_id = Column(String(255))
-    keypair = Column(String(255))
     stack_id = Column(String(255))
     api_address = Column(String(255))
     node_addresses = Column(JSONEncodedList)
-    node_count = Column(Integer())
-    master_count = Column(Integer())
     status = Column(String(20))
     status_reason = Column(Text)
-    create_timeout = Column(Integer())
-    discovery_url = Column(String(255))
     master_addresses = Column(JSONEncodedList)
     # TODO(wanghua): encrypt trust_id in db
     trust_id = Column(String(255))
@@ -142,6 +138,9 @@ class Cluster(Base):
     # so, we use 512 chars to get some buffer.
     ca_cert_ref = Column(String(512))
     magnum_cert_ref = Column(String(512))
+    cluster_attributes_id = Column(String(length=36),
+                                   ForeignKey('cluster_attributes.id'),
+                                   nullable=False)
 
 
 class ClusterTemplate(Base):
@@ -157,11 +156,22 @@ class ClusterTemplate(Base):
     project_id = Column(String(255))
     user_id = Column(String(255))
     name = Column(String(255))
-    image_id = Column(String(255))
-    flavor_id = Column(String(255))
-    master_flavor_id = Column(String(255))
-    keypair_id = Column(String(255))
-    external_network_id = Column(String(255))
+    public = Column(Boolean, default=False)
+    cluster_attributes_id = Column(String(length=36),
+                                   ForeignKey('cluster_attributes.id'))
+
+
+class ClusterAttributes(Base):
+    """Represents a set of ClusterAttributes."""
+
+    __tablename__ = 'cluster_attributes'
+
+    id = Column(String(36), primary_key=True)
+    image = Column(String(255))
+    flavor = Column(String(255))
+    master_flavor = Column(String(255))
+    keypair = Column(String(255))
+    external_network = Column(String(255))
     fixed_network = Column(String(255))
     fixed_subnet = Column(String(255))
     network_driver = Column(String(255))
@@ -178,11 +188,14 @@ class ClusterTemplate(Base):
     registry_enabled = Column(Boolean, default=False)
     labels = Column(JSONEncodedDict)
     tls_disabled = Column(Boolean, default=False)
-    public = Column(Boolean, default=False)
     server_type = Column(String(255))
     insecure_registry = Column(String(255))
     master_lb_enabled = Column(Boolean, default=False)
     floating_ip_enabled = Column(Boolean, default=True)
+    node_count = Column(Integer())
+    master_count = Column(Integer())
+    create_timeout = Column(Integer())
+    discovery_url = Column(String(255))
 
 
 class X509KeyPair(Base):
