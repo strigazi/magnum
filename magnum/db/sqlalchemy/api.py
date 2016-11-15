@@ -152,9 +152,21 @@ class Connection(api.Connection):
         if not values.get('uuid'):
             values['uuid'] = uuidutils.generate_uuid()
 
+        cluster_uuid = values['uuid']
+        cluster_attributes_id = uuidutils.generate_uuid()
+
+        values['id'] = cluster_attributes_id
+        cluster_attributes = models.ClusterAttributes()
+        cluster_attributes.update(values)
+
+        del values['id']
+        values['uuid'] = cluster_uuid
+        values['cluster_attributes_id'] = cluster_attributes_id
+
         cluster = models.Cluster()
         cluster.update(values)
         try:
+            cluster_attributes.save()
             cluster.save()
         except db_exc.DBDuplicateEntry:
             raise exception.ClusterAlreadyExists(uuid=values['uuid'])
@@ -259,9 +271,21 @@ class Connection(api.Connection):
         if not values.get('uuid'):
             values['uuid'] = uuidutils.generate_uuid()
 
+        cluster_template_uuid = values['uuid']
+        cluster_attributes_id = uuidutils.generate_uuid()
+
+        values['id'] = cluster_attributes_id
+        cluster_attributes = models.ClusterAttributes()
+        cluster_attributes.update(values)
+
+        del values['id']
+        values['uuid'] = cluster_template_uuid
+        values['cluster_attributes_id'] = cluster_attributes_id
+
         cluster_template = models.ClusterTemplate()
         cluster_template.update(values)
         try:
+            cluster_attributes.save()
             cluster_template.save()
         except db_exc.DBDuplicateEntry:
             raise exception.ClusterTemplateAlreadyExists(uuid=values['uuid'])

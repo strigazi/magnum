@@ -24,6 +24,7 @@ from sqlalchemy import Boolean
 from sqlalchemy import Column
 from sqlalchemy import DateTime
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import schema
 from sqlalchemy import String
@@ -142,6 +143,9 @@ class Cluster(Base):
     # so, we use 512 chars to get some buffer.
     ca_cert_ref = Column(String(512))
     magnum_cert_ref = Column(String(512))
+    cluster_attributes_id = Column(String(length=36),
+                                   ForeignKey('cluster_attributes.id'),
+                                   nullable=False)
 
 
 class ClusterTemplate(Base):
@@ -183,6 +187,46 @@ class ClusterTemplate(Base):
     insecure_registry = Column(String(255))
     master_lb_enabled = Column(Boolean, default=False)
     floating_ip_enabled = Column(Boolean, default=True)
+    cluster_attributes_id = Column(String(length=36),
+                                   ForeignKey('cluster_attributes.id'),
+                                   nullable=False)
+
+
+class ClusterAttributes(Base):
+    """Represents a set of ClusterAttributes."""
+
+    __tablename__ = 'cluster_attributes'
+
+    id = Column(String(36), primary_key=True)
+    image = Column(String(255))
+    flavor = Column(String(255))
+    master_flavor = Column(String(255))
+    keypair = Column(String(255))
+    external_network = Column(String(255))
+    fixed_network = Column(String(255))
+    fixed_subnet = Column(String(255))
+    network_driver = Column(String(255))
+    volume_driver = Column(String(255))
+    dns_nameserver = Column(String(255))
+    apiserver_port = Column(Integer())
+    docker_volume_size = Column(Integer())
+    docker_storage_driver = Column(String(255))
+    cluster_distro = Column(String(255))
+    coe = Column(String(255))
+    http_proxy = Column(String(255))
+    https_proxy = Column(String(255))
+    no_proxy = Column(String(255))
+    registry_enabled = Column(Boolean, default=False)
+    labels = Column(JSONEncodedDict)
+    tls_disabled = Column(Boolean, default=False)
+    server_type = Column(String(255))
+    insecure_registry = Column(String(255))
+    master_lb_enabled = Column(Boolean, default=False)
+    floating_ip_enabled = Column(Boolean, default=True)
+    node_count = Column(Integer())
+    master_count = Column(Integer())
+    create_timeout = Column(Integer())
+    discovery_url = Column(String(255))
 
 
 class X509KeyPair(Base):
