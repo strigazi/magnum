@@ -4,31 +4,45 @@
 
 myip="$SWARM_NODE_IP"
 
+cat > /etc/systemd/system/swarm-token.service << EOF
+[Unit]
+Description=Get Swarm Token
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/sh -c "/usr/bin/echo -n TOKEN= > /etc/sysconfig/swarm-token.env"
+ExecStart=/usr/bin/sh -c "/usr/bin/docker \\
+--tlsverify \\
+--tlscacert=/etc/docker/ca.crt \\
+--tlskey=/etc/docker/server.key \\
+--tlscert=/etc/docker/server.crt \\
+-H $SWARM_API_IP \\
+swarm join-token worker | grep token | awk '{print \$2}' >> /etc/sysconfig/swarm-token.env"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+chown root:root /etc/systemd/system/swarm-token.service
+chmod 644 /etc/systemd/system/swarm-token.service
+
+systemctl daemon-reload
+
 CONF_FILE=/etc/systemd/system/swarm-agent.service
 
 cat > $CONF_FILE << EOF
 [Unit]
 Description=Swarm Agent
-After=docker.service
-Requires=docker.service
-OnFailure=swarm-agent-failure.service
+After=swarm-token.service
+Requires=swarm-token.service
 
 [Service]
+Type=oneshot
 TimeoutStartSec=0
-ExecStartPre=-/usr/bin/docker kill swarm-agent
-ExecStartPre=-/usr/bin/docker rm swarm-agent
-ExecStartPre=-/usr/bin/docker pull swarm:$SWARM_VERSION
-ExecStart=/usr/bin/docker run -e http_proxy=$HTTP_PROXY \\
-                              -e https_proxy=$HTTPS_PROXY \\
-                              -e no_proxy=$NO_PROXY \\
-                              --name swarm-agent \\
-                              swarm:$SWARM_VERSION \\
-                              join \\
-                              --addr $myip:2375 \\
-                              etcd://$ETCD_SERVER_IP:2379/v2/keys/swarm/
-Restart=always
-ExecStop=/usr/bin/docker stop swarm-agent
-ExecStartPost=/usr/local/bin/notify-heat
+EnvironmentFile=/etc/sysconfig/swarm-token.env
+ExecStart=/usr/bin/docker swarm join --token \$TOKEN $SWARM_API_IP:2377
 
 [Install]
 WantedBy=multi-user.target
@@ -41,16 +55,6 @@ SCRIPT=/usr/local/bin/notify-heat
 
 cat > $SCRIPT << EOF
 #!/bin/sh
-until etcdctl \
-  --peers $ETCD_SERVER_IP:2379 \
-  --timeout 1s \
-  --total-timeout 5s \
-  ls /v2/keys/swarm/docker/swarm/nodes/$myip:2375
-do
-    echo "Waiting for swarm agent registration..."
-    sleep 5
-done
-
 curl -k -i -X POST -H 'Content-Type: application/json' -H 'X-Auth-Token: $WAIT_HANDLE_TOKEN' \
     --data-binary "'"'{"Status": "SUCCESS", "Reason": "Swarm agent ready", "Data": "OK", "UniqueId": "00000"}'"'" \
     "$WAIT_HANDLE_ENDPOINT"
