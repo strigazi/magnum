@@ -73,13 +73,16 @@ function create_test_data {
 auth_url = $OS_AUTH_URL
 magnum_url = $BYPASS_URL
 username = $OS_USERNAME
-tenant_name = $OS_TENANT_NAME
+project_name = $OS_PROJECT_NAME
+project_domain_id = $OS_PROJECT_DOMAIN_ID
+user_domain_id = $OS_USER_DOMAIN_ID
 password = $OS_PASSWORD
-auth_version = v2
+auth_version = v3
 insecure = False
 [admin]
 user = $OS_USERNAME
-tenant = $OS_TENANT_NAME
+project_domain_id = $OS_PROJECT_DOMAIN_ID
+user_domain_id = $OS_USER_DOMAIN_ID
 pass = $OS_PASSWORD
 region_name = $OS_REGION_NAME
 [magnum]
@@ -109,19 +112,7 @@ function add_flavor {
     # Get admin credentials
     pushd ../devstack
     source openrc admin admin
-    # NOTE(hongbin): This is a temporary work around. These variables are for
-    # keystone v3, but magnum is using v2 API. Therefore, unset them to make the
-    # keystoneclient work.
-    # Bug: #1473600
-    unset OS_PROJECT_DOMAIN_ID
-    unset OS_USER_DOMAIN_ID
-    unset OS_AUTH_TYPE
     popd
-
-    # Due to keystone defaulting everything to v3, we need to update to make func tests
-    # work in our gates back to v2
-    export OS_AUTH_URL=http://127.0.0.1:5000/v2.0
-    export OS_IDENTITY_API_VERSION=2.0
 
     # Create magnum specific flavor for use in functional tests.
     echo_summary "Create a flavor"
@@ -173,7 +164,6 @@ if [[ "api" == "$coe" ]]; then
 
     # Set demo credentials
     source $BASE/new/devstack/accrc/demo/demo
-    unset OS_AUTH_TYPE
 
     create_test_data $coe
 
@@ -198,13 +188,6 @@ else
     # Get admin credentials
     pushd ../devstack
     source openrc admin admin
-    # NOTE(hongbin): This is a temporary work around. These variables are for
-    # keystone v3, but magnum is using v2 API. Therefore, unset them to make the
-    # keystoneclient work.
-    # Bug: #1473600
-    unset OS_PROJECT_DOMAIN_ID
-    unset OS_USER_DOMAIN_ID
-    unset OS_AUTH_TYPE
     popd
 
     add_flavor
