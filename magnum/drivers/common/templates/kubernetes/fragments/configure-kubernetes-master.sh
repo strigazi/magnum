@@ -25,12 +25,17 @@ else
     KUBE_API_ARGS="$KUBE_API_ARGS --client-ca-file=/srv/kubernetes/ca.crt"
 fi
 
+KUBE_ADMISSION_CONTROL=""
+if [ -n "${ADMISSION_CONTROL_LIST}" ]; then
+    KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL_LIST}"
+fi
+
 sed -i '
     /^KUBE_API_ADDRESS=/ s/=.*/="'"${KUBE_API_ADDRESS}"'"/
     /^KUBE_SERVICE_ADDRESSES=/ s|=.*|="--service-cluster-ip-range='"$PORTAL_NETWORK_CIDR"'"|
     /^KUBE_API_ARGS=/ s/KUBE_API_ARGS.//
     /^KUBE_ETCD_SERVERS=/ s/=.*/="--etcd-servers=http:\/\/127.0.0.1:2379"/
-    /^KUBE_ADMISSION_CONTROL=/ s/=.*/=""/
+    /^KUBE_ADMISSION_CONTROL=/ s/=.*/="'"${KUBE_ADMISSION_CONTROL}"'"/
 ' /etc/kubernetes/apiserver
 cat << _EOC_ >> /etc/kubernetes/apiserver
 #Uncomment the following line to disable Load Balancer feature

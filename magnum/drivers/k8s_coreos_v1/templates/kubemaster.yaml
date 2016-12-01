@@ -63,6 +63,11 @@ parameters:
     constraints:
       - allowed_values: ["udp", "vxlan", "host-gw"]
 
+  admission_control_list:
+    type: string
+    description: >
+      List of admission control plugins to activate
+
   fixed_network:
     type: string
     description: Network from which to allocate fixed addresses.
@@ -200,6 +205,7 @@ resources:
             "$FLANNEL_NETWORK_SUBNETLEN": {get_param: flannel_network_subnetlen}
             "$FLANNEL_BACKEND": {get_param: flannel_backend}
             "$PORTAL_NETWORK_CIDR": {get_param: portal_network_cidr}
+            "$ADMISSION_CONTROL_LIST": {get_param: admission_control_list}
             "$CLUSTER_SUBNET": {get_param: fixed_subnet}
             "$ETCD_DISCOVERY_URL": {get_param: discovery_url}
             "$WAIT_CURL": {get_attr: [master_wait_handle, curl_cli]}

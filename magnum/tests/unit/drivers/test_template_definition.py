@@ -254,6 +254,8 @@ class AtomicK8sTemplateDefinitionTestCase(BaseTemplateDefinitionTestCase):
         flannel_subnet = mock_cluster_template.labels.get(
             'flannel_network_subnetlen')
         flannel_backend = mock_cluster_template.labels.get('flannel_backend')
+        admission_control_list = mock_cluster_template.labels.get(
+            'admission_control_list')
 
         k8s_def = k8sa_tdef.AtomicK8sTemplateDefinition()
 
@@ -266,6 +268,7 @@ class AtomicK8sTemplateDefinitionTestCase(BaseTemplateDefinitionTestCase):
             'flannel_network_cidr': flannel_cidr,
             'flannel_network_subnetlen': flannel_subnet,
             'flannel_backend': flannel_backend,
+            'admission_control_list': admission_control_list,
             'username': 'fake_user',
             'tenant_name': 'fake_tenant',
             'magnum_url': mock_osc.magnum_url.return_value,
@@ -310,6 +313,8 @@ class AtomicK8sTemplateDefinitionTestCase(BaseTemplateDefinitionTestCase):
         flannel_subnet = mock_cluster_template.labels.get(
             'flannel_network_subnetlen')
         flannel_backend = mock_cluster_template.labels.get('flannel_backend')
+        admission_control_list = mock_cluster_template.labels.get(
+            'admission_control_list')
 
         k8s_def = k8sa_tdef.AtomicK8sTemplateDefinition()
 
@@ -322,6 +327,7 @@ class AtomicK8sTemplateDefinitionTestCase(BaseTemplateDefinitionTestCase):
             'flannel_network_cidr': flannel_cidr,
             'flannel_network_subnetlen': flannel_subnet,
             'flannel_backend': flannel_backend,
+            'admission_control_list': admission_control_list,
             'username': 'fake_user',
             'tenant_name': 'fake_tenant',
             'magnum_url': mock_osc.magnum_url.return_value,
