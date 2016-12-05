@@ -10,11 +10,7 @@ if [ -z "$KUBE_NODE_IP" ]; then
 fi
 
 sed -i '
-  /^ETCD_LISTEN_CLIENT_URLS=/ s/=.*/="http:\/\/0.0.0.0:2379"/
-' /etc/etcd/etcd.conf
-
-sed -i '
-  /^KUBE_ALLOW_PRIV=/ s/=.*/="--allow_privileged='"$KUBE_ALLOW_PRIV"'"/
+    /^KUBE_ALLOW_PRIV=/ s/=.*/="--allow-privileged='"$KUBE_ALLOW_PRIV"'"/
 ' /etc/kubernetes/config
 
 KUBE_API_ARGS="--runtime_config=api/all=true"
