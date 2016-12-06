@@ -23,6 +23,8 @@ down_revision = 'bc46ba6cf949'
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import Table, MetaData, select
+from oslo_utils import uuidutils
 
 
 docker_storage_driver_enum = sa.Enum('devicemapper', 'overlay',
@@ -30,6 +32,7 @@ docker_storage_driver_enum = sa.Enum('devicemapper', 'overlay',
 
 
 def upgrade():
+    # Create cluster_attributes tables
     op.create_table(
         'cluster_attributes',
         sa.Column('id', sa.String(length=36), nullable=False,
@@ -71,22 +74,118 @@ def upgrade():
         mysql_DEFAULT_CHARSET='UTF8'
     )
 
+    # Add cluster_attributes_id column in cluster_template
+    op.add_column('cluster_template',
+                  sa.Column('cluster_attributes_id',
+                            sa.String(length=36),
+                            nullable=False))
+
+    # Add cluster_attributes_id column in cluster
     op.add_column('cluster',
                   sa.Column('cluster_attributes_id',
                             sa.String(length=36),
-                            sa.ForeignKey('cluster_attributes.id',
-                                          ondelete='CASCADE'),
                             nullable=False))
+
+    # Transfer data from cluster_template to cluster_attributes
+    # we need also to generate the ids in cluster_attributes
+    ct_table = Table('cluster_template', MetaData(),
+                     sa.Column('id', sa.Integer, primary_key=True),
+                     sa.Column('cluster_attributes_id', sa.String())
+                     )
+    cluster_table = Table('cluster', MetaData(),
+                          sa.Column('id', sa.Integer, primary_key=True),
+                          sa.Column('cluster_attributes_id', sa.String())
+                          )
+    connection = op.get_bind()
+    for row in connection.execute(select([ct_table.c.id])):
+        connection.execute(
+            ct_table.update().
+            values(cluster_attributes_id=uuidutils.generate_uuid()).
+            where(ct_table.c.id == row['id'])
+        )
+    for row in connection.execute(select([cluster_table.c.id])):
+        connection.execute(
+            cluster_table.update().
+            values(cluster_attributes_id=uuidutils.generate_uuid()).
+            where(cluster_table.c.id == row['id'])
+        )
+
+    op.create_unique_constraint("uniq_cluster_template0cluster_attributes_id",
+                                "cluster_template", ["cluster_attributes_id"])
 
     op.create_unique_constraint("uniq_cluster0cluster_attributes_id",
                                 "cluster", ["cluster_attributes_id"])
 
-    op.add_column('cluster_template',
-                  sa.Column('cluster_attributes_id',
-                            sa.String(length=36),
-                            sa.ForeignKey('cluster_attributes.id',
-                                          ondelete='CASCADE'),
-                            nullable=False))
+    op.execute("INSERT INTO cluster_attributes "
+               "(id, "
+               "apiserver_port, "
+               "cluster_distro, "
+               "coe, "
+               "dns_nameserver, "
+               "docker_storage_driver, "
+               "docker_volume_size, "
+               "external_network, "
+               "fixed_network, "
+               "fixed_subnet, "
+               "flavor, "
+               "floating_ip_enabled, "
+               "http_proxy, "
+               "https_proxy, "
+               "image, "
+               "insecure_registry, "
+               "keypair, "
+               "labels, "
+               "master_flavor, "
+               "master_lb_enabled, "
+               "network_driver, "
+               "no_proxy, "
+               "registry_enabled, "
+               "server_type, "
+               "tls_disabled, "
+               "volume_driver) "
+               "SELECT "
+               "cluster_attributes_id, "
+               "apiserver_port, "
+               "cluster_distro, "
+               "coe, "
+               "dns_nameserver, "
+               "docker_storage_driver, "
+               "docker_volume_size, "
+               "external_network_id, "
+               "fixed_network, "
+               "fixed_subnet, "
+               "flavor_id, "
+               "floating_ip_enabled, "
+               "http_proxy, "
+               "https_proxy, "
+               "image_id, "
+               "insecure_registry, "
+               "keypair_id, "
+               "labels, "
+               "master_flavor_id, "
+               "master_lb_enabled, "
+               "network_driver, "
+               "no_proxy, "
+               "registry_enabled, "
+               "server_type, "
+               "tls_disabled, "
+               "volume_driver "
+               "FROM cluster_template"
+               )
 
-    op.create_unique_constraint("uniq_cluster_template0cluster_attributes_id",
-                                "cluster_template", ["cluster_attributes_id"])
+    op.execute("INSERT INTO cluster_attributes "
+               "(id, "
+               "create_timeout, "
+               "discovery_url, "
+               "keypair, "
+               "master_count, "
+               "node_count) "
+               "SELECT "
+               "cluster_attributes_id, "
+               "create_timeout, "
+               "discovery_url, "
+               "keypair, "
+               "master_count, "
+               "node_count "
+               "FROM cluster"
+               )
