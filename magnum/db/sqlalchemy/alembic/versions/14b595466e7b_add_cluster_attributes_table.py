@@ -189,3 +189,11 @@ def upgrade():
                "node_count "
                "FROM cluster"
                )
+
+    op.create_foreign_key('cluster_template_cluster_attributes',
+                          'cluster_template', 'cluster_attributes',
+                          ['cluster_attributes_id'], ['id'], ondelete='CASCADE')
+
+    op.create_foreign_key('cluster_cluster_attributes',
+                          'cluster', 'cluster_attributes',
+                          ['cluster_attributes_id'], ['id'], ondelete='CASCADE')
