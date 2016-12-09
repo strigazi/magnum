@@ -41,7 +41,8 @@ class ClusterTemplate(base.MagnumPersistentObject, base.MagnumObject,
     # Version 1.15: Added 'floating_ip_enabled' field
     # Version 1.16: Renamed the class from "BayModel' to 'ClusterTemplate'
     # Version 1.17: 'coe' field type change to ClusterTypeField
-    VERSION = '1.17'
+    # Version 1.18: Add 'driver' field
+    VERSION = '1.18'
 
     dbapi = dbapi.get_instance()
 
@@ -78,6 +79,7 @@ class ClusterTemplate(base.MagnumPersistentObject, base.MagnumObject,
         'insecure_registry': fields.StringField(nullable=True),
         'master_lb_enabled': fields.BooleanField(default=False),
         'floating_ip_enabled': fields.BooleanField(default=True),
+        'driver': fields.StringField(nullable=False),
     }
 
     @staticmethod

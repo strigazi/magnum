@@ -13,6 +13,7 @@
 # under the License.
 
 import abc
+import itertools
 import six
 
 from oslo_config import cfg
@@ -32,6 +33,7 @@ LOG = logging.getLogger(__name__)
 class Driver(object):
 
     definitions = None
+    drivers = None
 
     @classmethod
     def load_entry_points(cls):
@@ -42,52 +44,37 @@ class Driver(object):
     def get_drivers(cls):
         '''Retrieves cluster drivers from python entry_points.
 
-        Example:
+        get_driver will return:
 
-        With the following classes:
-        class Driver1(Driver):
-            provides = [
-                ('server_type1', 'os1', 'coe1')
-            ]
-
-        class Driver2(Driver):
-            provides = [
-                ('server_type2', 'os2', 'coe2')
-            ]
-
-        And the following entry_points:
-
-        magnum.drivers =
-            driver_name_1 = some.python.path:Driver1
-            driver_name_2 = some.python.path:Driver2
-
-        get_drivers will return:
+        (
             {
-                (server_type1, os1, coe1):
-                    {'driver_name_1': Driver1},
-                (server_type2, os2, coe2):
-                    {'driver_name_2': Driver2}
-            }
+                (server_type1, os_distro1, coe1): [driver_nameX, driver_nameY],
+                (server_type2, os_distro2, coe2): [driver_nameZ]
+            },
+            [driver_nameX, driver_nameY, driver_nameZ]
+        )
 
-        :return: dict
+        :return: tuple
         '''
 
-        if not cls.definitions:
+        if not cls.definitions or not cls.drivers:
             cls.definitions = dict()
             for entry_point, def_class in cls.load_entry_points():
                 for cluster_type in def_class().provides:
                     cluster_type_tuple = (cluster_type['server_type'],
                                           cluster_type['os'],
                                           cluster_type['coe'])
-                    providers = cls.definitions.setdefault(cluster_type_tuple,
-                                                           dict())
-                    providers['entry_point_name'] = entry_point.name
-                    providers['class'] = def_class
 
-        return cls.definitions
+                    l = cls.definitions.get(cluster_type_tuple, list())
+                    l.append(entry_point.name)
+
+            cls.drivers = itertools.chain.from_iterable(
+                cls.definitions.values())
+
+        return (cls.definitions, cls.drivers)
 
     @classmethod
-    def get_driver(cls, server_type, os, coe):
+    def get_driver_name_by_cluster_type(cls, server_type, os, coe):
         '''Get Driver.
 
         Returns the Driver class for the provided cluster_type.
@@ -121,26 +108,40 @@ class Driver(object):
         :return: class
         '''
 
-        definition_map = cls.get_drivers()
+        definitions, _ = cls.get_drivers()
         cluster_type = (server_type, os, coe)
 
-        if cluster_type not in definition_map:
+        if cluster_type not in definitions:
             raise exception.ClusterTypeNotSupported(
                 server_type=server_type,
                 os=os,
                 coe=coe)
-        driver_info = definition_map[cluster_type]
-        # TODO(muralia): once --drivername is supported as an input during
-        # cluster create, change the following line to use driver name for
-        # loading.
-        return driver.DriverManager("magnum.drivers",
-                                    driver_info['entry_point_name']).driver()
+        if len(definitions[cluster_type]) == 1:
+            return definitions[cluster_type][0]
+        else:
+            raise exception.MultipleClusterTypes(
+                server_type=server_type,
+                os=os,
+                coe=coe)
 
     @classmethod
-    def get_driver_for_cluster(cls, context, cluster):
-        ct = cluster_template.ClusterTemplate.get_by_uuid(
-            context, cluster.cluster_template_id)
-        return cls.get_driver(ct.server_type, ct.cluster_distro, ct.coe)
+    def get_driver(cls, driver_name):
+        '''Get Driver by name.
+
+        Returns the Driver class.
+
+        :param driver_name: The requested driver name
+
+        :return: class
+        '''
+
+        _, drivers = cls.get_drivers()
+
+        if driver_name not in drivers:
+            raise exception.ClusterDriverNotSupported(
+                cluster_driver=driver_name)
+
+        return driver.DriverManager("magnum.drivers", driver_name).driver()
 
     def update_cluster_status(self, context, cluster):
         '''Update the cluster status based on underlying orchestration

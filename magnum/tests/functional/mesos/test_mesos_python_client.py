@@ -18,7 +18,8 @@ class TestClusterResource(ClusterTest):
     cluster_template_kwargs = {
         "tls_disabled": True,
         "network_driver": 'docker',
-        "volume_driver": 'rexray'
+        "volume_driver": 'rexray',
+        "driver": "mesos_ubuntu_v1"
     }
 
     def test_cluster_create_and_delete(self):

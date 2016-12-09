@@ -104,6 +104,7 @@ def baymodel_data(**kwargs):
     data = {
         "name": data_utils.rand_name('bay'),
         "coe": "swarm",
+        "driver": "swarm_fedora_atomic_v1",
         "tls_disabled": False,
         "network_driver": None,
         "volume_driver": None,
@@ -223,7 +224,7 @@ def valid_swarm_baymodel(is_public=False):
                          external_network_id=config.Config.nic_id,
                          http_proxy=None, https_proxy=None, no_proxy=None,
                          network_driver=None, volume_driver=None, labels={},
-                         tls_disabled=False)
+                         tls_disabled=False, driver="swarm_fedora_atomic_v1")
 
 
 def bay_data(name=data_utils.rand_name('bay'),
@@ -344,6 +345,7 @@ def cluster_template_data(**kwargs):
     data = {
         "name": data_utils.rand_name('cluster'),
         "coe": "swarm",
+        "driver": "swarm_fedora_atomic_v1",
         "tls_disabled": False,
         "network_driver": None,
         "volume_driver": None,
@@ -497,6 +499,7 @@ def valid_swarm_cluster_template(is_public=False):
                                  dns_nameserver=config.Config.dns_nameserver,
                                  master_flavor_id=master_flavor_id,
                                  coe="swarm",
+                                 driver="swarm_fedora_atomic_v1",
                                  cluster_distro=None,
                                  external_network_id=config.Config.nic_id,
                                  http_proxy=None, https_proxy=None,

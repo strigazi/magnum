@@ -57,9 +57,7 @@ class TemplateDefinitionTestCase(base.TestCase):
     @mock.patch('magnum.drivers.common.driver.Driver.get_driver')
     def test_get_vm_atomic_kubernetes_definition(self, mock_driver):
         mock_driver.return_value = k8sa_dr.Driver()
-        cluster_driver = driver.Driver.get_driver('vm',
-                                                  'fedora-atomic',
-                                                  'kubernetes')
+        cluster_driver = driver.Driver.get_driver('k8s_fedora_atomic_v1')
         definition = cluster_driver.get_template_definition()
 
         self.assertIsInstance(definition,
@@ -68,9 +66,7 @@ class TemplateDefinitionTestCase(base.TestCase):
     @mock.patch('magnum.drivers.common.driver.Driver.get_driver')
     def test_get_bm_fedora_kubernetes_ironic_definition(self, mock_driver):
         mock_driver.return_value = k8s_i_dr.Driver()
-        cluster_driver = driver.Driver.get_driver('bm',
-                                                  'fedora',
-                                                  'kubernetes')
+        cluster_driver = driver.Driver.get_driver('k8s_fedora_ironic_v1')
         definition = cluster_driver.get_template_definition()
 
         self.assertIsInstance(definition,
@@ -79,7 +75,7 @@ class TemplateDefinitionTestCase(base.TestCase):
     @mock.patch('magnum.drivers.common.driver.Driver.get_driver')
     def test_get_vm_coreos_kubernetes_definition(self, mock_driver):
         mock_driver.return_value = k8s_coreos_dr.Driver()
-        cluster_driver = driver.Driver.get_driver('vm', 'coreos', 'kubernetes')
+        cluster_driver = driver.Driver.get_driver('k8s_coreos_v1')
         definition = cluster_driver.get_template_definition()
 
         self.assertIsInstance(definition,
@@ -88,9 +84,7 @@ class TemplateDefinitionTestCase(base.TestCase):
     @mock.patch('magnum.drivers.common.driver.Driver.get_driver')
     def test_get_vm_atomic_swarm_definition(self, mock_driver):
         mock_driver.return_value = swarm_dr.Driver()
-        cluster_driver = driver.Driver.get_driver('vm',
-                                                  'fedora-atomic',
-                                                  'swarm')
+        cluster_driver = driver.Driver.get_driver('swarm_fedora_atomic_v1')
         definition = cluster_driver.get_template_definition()
 
         self.assertIsInstance(definition,
@@ -99,18 +93,16 @@ class TemplateDefinitionTestCase(base.TestCase):
     @mock.patch('magnum.drivers.common.driver.Driver.get_driver')
     def test_get_vm_ubuntu_mesos_definition(self, mock_driver):
         mock_driver.return_value = mesos_dr.Driver()
-        cluster_driver = driver.Driver.get_driver('vm',
-                                                  'ubuntu',
-                                                  'mesos')
+        cluster_driver = driver.Driver.get_driver('mesos_ubuntu_v1')
         definition = cluster_driver.get_template_definition()
 
         self.assertIsInstance(definition,
                               mesos_tdef.UbuntuMesosTemplateDefinition)
 
     def test_get_driver_not_supported(self):
-        self.assertRaises(exception.ClusterTypeNotSupported,
+        self.assertRaises(exception.ClusterDriverNotSupported,
                           driver.Driver.get_driver,
-                          'vm', 'not_supported', 'kubernetes')
+                          'not_supported_driver')
 
     def test_required_param_not_set(self):
         param = cmn_tdef.ParameterMapping('test', cluster_template_attr='test',

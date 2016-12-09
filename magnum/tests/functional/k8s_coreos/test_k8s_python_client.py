@@ -17,5 +17,6 @@ class TestCoreosKubernetesAPIs(base.BaseK8sTest):
     cluster_template_kwargs = {
         "tls_disabled": True,
         "network_driver": 'flannel',
-        "volume_driver": None
+        "volume_driver": None,
+        "driver": "k8s_coreos_v1"
     }

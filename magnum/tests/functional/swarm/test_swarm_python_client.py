@@ -35,6 +35,7 @@ class TestSwarmAPIs(ClusterTest):
         "tls_disabled": False,
         "network_driver": None,
         "volume_driver": None,
+        "driver": "swarm_fedora_atomic_v1",
         "labels": {}
     }
 

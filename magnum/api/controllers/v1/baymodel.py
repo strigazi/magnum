@@ -138,6 +138,10 @@ class BayModel(base.APIBase):
     floating_ip_enabled = wsme.wsattr(types.boolean, default=True)
     """Indicates whether created bays should have a floating ip or not."""
 
+    driver = wsme.wsattr(wtypes.StringType(min_length=1, max_length=255),
+                         mandatory=True)
+    """The name of the cluster driver to use."""
+
     def __init__(self, **kwargs):
         self.fields = []
         for field in objects.ClusterTemplate.fields:
@@ -192,6 +196,7 @@ class BayModel(base.APIBase):
             public=False,
             master_lb_enabled=False,
             floating_ip_enabled=True,
+            driver='k8s_fedora_atomic_v1',
         )
         return cls._convert_with_links(sample, 'http://localhost:9511')
 
@@ -201,7 +206,7 @@ class BayModelPatchType(types.JsonPatchType):
     _extra_non_removable_attrs = {'/network_driver', '/external_network_id',
                                   '/tls_disabled', '/public', '/server_type',
                                   '/coe', '/registry_enabled',
-                                  '/cluster_distro'}
+                                  '/cluster_distro', '/driver'}
 
 
 class BayModelCollection(collection.Collection):

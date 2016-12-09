@@ -19,4 +19,5 @@ class TestKubernetesAPIs(base.BaseK8sTest):
         "network_driver": 'flannel',
         "volume_driver": 'cinder',
         "docker_storage_driver": 'overlay',
+        "driver": 'k8s_fedora_atomic_v1'
     }

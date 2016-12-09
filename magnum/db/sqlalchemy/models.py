@@ -183,6 +183,7 @@ class ClusterTemplate(Base):
     insecure_registry = Column(String(255))
     master_lb_enabled = Column(Boolean, default=False)
     floating_ip_enabled = Column(Boolean, default=True)
+    driver = Column(String(255))
 
 
 class X509KeyPair(Base):

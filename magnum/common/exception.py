@@ -265,9 +265,18 @@ class ClusterTypeNotSupported(MagnumException):
                 " not supported.")
 
 
+class MultipleClusterTypes(MagnumException):
+    message = _("Multiple Cluster types (%(server_type)s, %(os)s,"
+                " %(coe)s), please use the driver field.")
+
+
 class ClusterTypeNotEnabled(MagnumException):
     message = _("Cluster type (%(server_type)s, %(os)s, %(coe)s)"
                 " not enabled.")
+
+
+class ClusterDriverNotSupported(MagnumException):
+    message = _("Cluster driver %(cluster_driver)s not supported.")
 
 
 class RequiredParameterNotProvided(MagnumException):

@@ -42,6 +42,7 @@ def get_test_cluster_template(**kw):
                                         'devicemapper'),
         'cluster_distro': kw.get('cluster_distro', 'fedora-atomic'),
         'coe': kw.get('coe', 'swarm'),
+        'driver': kw.get('driver', 'swarm_fedora_atomic_v1'),
         'created_at': kw.get('created_at'),
         'updated_at': kw.get('updated_at'),
         'labels': kw.get('labels', {'key1': 'val1', 'key2': 'val2'}),

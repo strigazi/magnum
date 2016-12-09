@@ -110,9 +110,7 @@ class Handler(object):
 
         # Get driver
         ct = conductor_utils.retrieve_cluster_template(context, cluster)
-        cluster_driver = driver.Driver.get_driver(ct.server_type,
-                                                  ct.cluster_distro,
-                                                  ct.coe)
+        cluster_driver = driver.Driver.get_driver(ct.driver)
         # Update cluster
         try:
             conductor_utils.notify_about_cluster_operation(
@@ -139,9 +137,7 @@ class Handler(object):
         osc = clients.OpenStackClients(context)
         cluster = objects.Cluster.get_by_uuid(context, uuid)
         ct = conductor_utils.retrieve_cluster_template(context, cluster)
-        cluster_driver = driver.Driver.get_driver(ct.server_type,
-                                                  ct.cluster_distro,
-                                                  ct.coe)
+        cluster_driver = driver.Driver.get_driver(ct.driver)
         try:
             conductor_utils.notify_about_cluster_operation(
                 context, taxonomy.ACTION_DELETE, taxonomy.OUTCOME_PENDING)

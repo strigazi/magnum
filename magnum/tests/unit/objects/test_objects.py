@@ -356,7 +356,7 @@ class TestObject(test_base.TestCase, _TestObject):
 # http://docs.openstack.org/developer/magnum/objects.html
 object_data = {
     'Cluster': '1.11-d4566648f0158e45e43b0c0419814d1f',
-    'ClusterTemplate': '1.17-65a95ef932dd08800a83871eb3cf312b',
+    'ClusterTemplate': '1.18-7a0c0fa9def18c0925a666d881e68059',
     'Certificate': '1.1-1924dc077daa844f0f9076332ef96815',
     'MyObj': '1.0-34c4b1aadefd177b13f9a2f894cc23cd',
     'X509KeyPair': '1.2-d81950af36c59a71365e33ce539d24f9',
