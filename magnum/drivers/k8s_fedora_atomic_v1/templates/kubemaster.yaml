@@ -197,20 +197,6 @@ resources:
 
   ######################################################################
   #
-  # resource that exposes the IPs of either the kube master or the API
-  # LBaaS pool depending on whether LBaaS is enabled for the cluster.
-  #
-
-  api_address_switch:
-    type: Magnum::ApiGatewaySwitcher
-    properties:
-      pool_public_ip: {get_param: api_public_address}
-      pool_private_ip: {get_param: api_private_address}
-      master_public_ip: {get_attr: [kube_master_floating, floating_ip_address]}
-      master_private_ip: {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
-
-  ######################################################################
-  #
   # software configs.  these are components that are combined into
   # a multipart MIME user-data archive.
   #
@@ -221,13 +207,13 @@ resources:
       group: ungrouped
       config:
         str_replace:
-          template: {get_file: ../../common/templates/kubernetes/fragments/write-heat-params-master.yaml}
+          template: {get_file: ../../common/templates/kubernetes/fragments/write-heat-params-master.sh}
           params:
-            "$KUBE_API_PUBLIC_ADDRESS": {get_attr: [api_address_switch, public_ip]}
-            "$KUBE_API_PRIVATE_ADDRESS": {get_attr: [api_address_switch, private_ip]}
+            "$KUBE_API_PUBLIC_ADDRESS": ""
+            "$KUBE_API_PRIVATE_ADDRESS": ""
             "$KUBE_API_PORT": {get_param: kubernetes_port}
-            "$KUBE_NODE_PUBLIC_IP": {get_attr: [kube_master_floating, floating_ip_address]}
-            "$KUBE_NODE_IP": {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
+            "$KUBE_NODE_PUBLIC_IP": ""
+            "$KUBE_NODE_IP": ""
             "$KUBE_ALLOW_PRIV": {get_param: kube_allow_priv}
             "$DOCKER_VOLUME": {get_resource: docker_volume}
             "$DOCKER_VOLUME_SIZE": {get_param: docker_volume_size}
@@ -414,43 +400,6 @@ resources:
       user_data: {get_resource: kube_master_init}
       metadata:
         cern-services: false
-      networks:
-        - port: {get_resource: kube_master_eth0}
-
-  kube_master_eth0:
-    type: OS::Neutron::Port
-    properties:
-      network: {get_param: fixed_network}
-      security_groups:
-        - {get_param: secgroup_base_id}
-        - {get_param: secgroup_kube_master_id}
-      fixed_ips:
-        - subnet: {get_param: fixed_subnet}
-      allowed_address_pairs:
-        - ip_address: {get_param: flannel_network_cidr}
-      replacement_policy: AUTO
-
-  kube_master_floating:
-    type: Magnum::Optional::KubeMaster::Neutron::FloatingIP
-    properties:
-      floating_network: {get_param: external_network}
-      port_id: {get_resource: kube_master_eth0}
-
-  api_pool_member:
-    type: Magnum::Optional::Neutron::LBaaS::PoolMember
-    properties:
-      pool: {get_param: api_pool_id}
-      address: {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
-      subnet: { get_param: fixed_subnet }
-      protocol_port: {get_param: kubernetes_port}
-
-  etcd_pool_member:
-    type: Magnum::Optional::Neutron::LBaaS::PoolMember
-    properties:
-      pool: {get_param: etcd_pool_id}
-      address: {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
-      subnet: { get_param: fixed_subnet }
-      protocol_port: 2379
 
   ######################################################################
   #
@@ -473,11 +422,11 @@ resources:
 outputs:
 
   kube_master_ip:
-    value: {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
+    value: {get_attr: [kube-master, first_address]}
     description: >
       This is the "private" IP address of the Kubernetes master node.
 
   kube_master_external_ip:
-    value: {get_attr: [kube_master_floating, floating_ip_address]}
+    value: {get_attr: [kube-master, first_address]}
     description: >
       This is the "public" IP address of the Kubernetes master node.

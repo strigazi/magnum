@@ -169,26 +169,6 @@ resources:
 
   ######################################################################
   #
-  # resource that exposes the IPs of either the Swarm master or the API
-  # LBaaS pool depending on whether LBaaS is enabled for the cluster.
-  #
-
-  api_address_switch:
-    type: Magnum::ApiGatewaySwitcher
-    properties:
-      pool_public_ip: {get_param: api_ip_address}
-      pool_private_ip: {get_param: swarm_api_ip}
-      master_public_ip: {get_attr: [swarm_master_floating, floating_ip_address]}
-      master_private_ip: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
-
-  etcd_address_switch:
-    type: Magnum::ApiGatewaySwitcher
-    properties:
-      pool_private_ip: {get_param: etcd_server_ip}
-      master_private_ip: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
-
-  ######################################################################
-  #
   # software configs.  these are components that are combined into
   # a multipart MIME user-data archive.
   #
@@ -198,7 +178,7 @@ resources:
       group: ungrouped
       config:
         str_replace:
-          template: {get_file: fragments/write-heat-params-master.yaml}
+          template: {get_file: fragments/write-heat-params-master.sh}
           params:
             "$WAIT_HANDLE_ENDPOINT": {get_attr: [master_wait_handle, endpoint]}
             "$WAIT_HANDLE_TOKEN": {get_attr: [master_wait_handle, token]}
@@ -210,8 +190,8 @@ resources:
             "$HTTP_PROXY": {get_param: http_proxy}
             "$HTTPS_PROXY": {get_param: https_proxy}
             "$NO_PROXY": {get_param: no_proxy}
-            "$SWARM_API_IP": {get_attr: [api_address_switch, private_ip]}
-            "$SWARM_NODE_IP": {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
+            "$SWARM_API_IP": {get_param: swarm_api_ip}
+            "$SWARM_NODE_IP": ""
             "$CLUSTER_UUID": {get_param: cluster_uuid}
             "$MAGNUM_URL": {get_param: magnum_url}
             "$TLS_DISABLED": {get_param: tls_disabled}
@@ -219,8 +199,8 @@ resources:
             "$FLANNEL_NETWORK_CIDR": {get_param: flannel_network_cidr}
             "$FLANNEL_NETWORK_SUBNETLEN": {get_param: flannel_network_subnetlen}
             "$FLANNEL_BACKEND": {get_param: flannel_backend}
-            "$ETCD_SERVER_IP": {get_attr: [etcd_address_switch, private_ip]}
-            "$API_IP_ADDRESS": {get_attr: [api_address_switch, public_ip]}
+            "$ETCD_SERVER_IP": ""
+            "$API_IP_ADDRESS": ""
             "$SWARM_VERSION": {get_param: swarm_version}
             "$TRUSTEE_USER_ID": {get_param: trustee_user_id}
             "$TRUSTEE_PASSWORD": {get_param: trustee_password}
@@ -307,15 +287,9 @@ resources:
         str_replace:
           template: {get_file: fragments/write-swarm-master-service.sh}
           params:
-            "$ETCD_SERVER_IP": {get_attr: [etcd_address_switch, private_ip]}
-            "$NODE_IP": {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
             "$WAIT_HANDLE_ENDPOINT": {get_attr: [master_wait_handle, endpoint]}
             "$WAIT_HANDLE_TOKEN": {get_attr: [master_wait_handle, token]}
-            "$HTTP_PROXY": {get_param: http_proxy}
-            "$HTTPS_PROXY": {get_param: https_proxy}
-            "$NO_PROXY": {get_param: no_proxy}
-            "$TLS_DISABLED": {get_param: tls_disabled}
-            "$SWARM_VERSION": {get_param: swarm_version}
+            # only replace $WAIT_HANDLE, others are sourced from heat-params
 
   enable_services:
     type: "OS::Heat::SoftwareConfig"
@@ -399,46 +373,6 @@ resources:
       user_data: {get_resource: swarm_master_init}
       metadata:
         cern-services: false
-      networks:
-        - port:
-            get_resource: swarm_master_eth0
-
-  swarm_master_eth0:
-    type: "OS::Neutron::Port"
-    properties:
-      network_id:
-        get_param: fixed_network_id
-      security_groups:
-        - {get_param: secgroup_swarm_master_id}
-      fixed_ips:
-        - subnet_id:
-            get_param: fixed_subnet_id
-      allowed_address_pairs:
-        - ip_address: {get_param: flannel_network_cidr}
-
-  swarm_master_floating:
-    type: "OS::Neutron::FloatingIP"
-    properties:
-      floating_network:
-        get_param: external_network
-      port_id:
-        get_resource: swarm_master_eth0
-
-  api_pool_member:
-    type: Magnum::Optional::Neutron::LBaaS::PoolMember
-    properties:
-      pool: {get_param: api_pool_id}
-      address: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
-      subnet: { get_param: fixed_subnet_id }
-      protocol_port: {get_param: swarm_port}
-
-  etcd_pool_member:
-    type: Magnum::Optional::Neutron::LBaaS::PoolMember
-    properties:
-      pool: {get_param: etcd_pool_id}
-      address: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
-      subnet: { get_param: fixed_subnet_id }
-      protocol_port: 2379
 
   ######################################################################
   #
@@ -461,11 +395,11 @@ resources:
 outputs:
 
   swarm_master_ip:
-    value: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
+    value: {get_attr: [swarm-master, first_address]}
     description: >
       This is the "private" addresses of all the Swarm master.
 
   swarm_master_external_ip:
-    value: {get_attr: [swarm_master_floating, floating_ip_address]}
+    value: {get_attr: [swarm-master, first_address]}
     description: >
       This is the "public" ip addresses of Swarm master.
