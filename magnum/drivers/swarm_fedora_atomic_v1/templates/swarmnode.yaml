@@ -361,6 +361,8 @@ resources:
         get_param: ssh_key_name
       user_data_format: RAW
       user_data: {get_resource: swarm_node_init}
+      metadata:
+        cern-services: false
       networks:
         - port:
             get_resource: swarm_node_eth0

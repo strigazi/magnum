@@ -57,6 +57,8 @@ resources:
       flavor: {get_param: master_flavor}
       key_name: {get_param: ssh_key_name}
       user_data_format: SOFTWARE_CONFIG
+      metadata:
+        cern-services: false
       networks:
         - port: {get_resource: mesos_master_eth0}
 

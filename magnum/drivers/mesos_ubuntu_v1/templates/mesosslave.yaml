@@ -243,6 +243,8 @@ resources:
       key_name: {get_param: ssh_key_name}
       user_data_format: RAW
       user_data: {get_resource: mesos_slave_init}
+      metadata:
+        cern-services: false
       networks:
         - port: {get_resource: mesos_slave_eth0}
 

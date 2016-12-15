@@ -397,6 +397,8 @@ resources:
         get_param: ssh_key_name
       user_data_format: RAW
       user_data: {get_resource: swarm_master_init}
+      metadata:
+        cern-services: false
       networks:
         - port:
             get_resource: swarm_master_eth0
