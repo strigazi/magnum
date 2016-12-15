@@ -31,8 +31,8 @@ sed -i '
 # The hostname of the node is set to be the Nova name of the instance, and
 # the option --hostname-override for kubelet uses the hostname to register the node.
 # Using any other name will break the load balancer and cinder volume features.
-HOSTNAME=$(hostname --short | sed 's/\.novalocal//')
-KUBELET_ARGS="--config=/etc/kubernetes/manifests --cadvisor-port=4194 ${KUBE_CONFIG} --hostname-override=${HOSTNAME}"
+HOSTNAME=$(hostname -I | cut -d' ' -f1)
+KUBELET_ARGS="--config=/etc/kubernetes/manifests --cadvisor-port=4194 --hostname-override=${HOSTNAME} --cluster-dns=10.254.10.10 --cluster-domain=cluster.local ${KUBE_CONFIG}"
 
 if [ -n "${INSECURE_REGISTRY_URL}" ]; then
     KUBELET_ARGS="${KUBELET_ARGS} --pod-infra-container-image=${INSECURE_REGISTRY_URL}/google_containers/pause\:0.8.0"

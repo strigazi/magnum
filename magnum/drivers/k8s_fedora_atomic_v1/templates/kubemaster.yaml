@@ -332,6 +332,12 @@ resources:
       group: ungrouped
       config: {get_file: ../../common/templates/kubernetes/fragments/kube-system-namespace-service.sh}
 
+  kube_dns_service:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/kubernetes/fragments/kube-dns-service.sh}
+
   kube_ui_service:
     type: OS::Heat::SoftwareConfig
     properties:
@@ -385,6 +391,7 @@ resources:
         - config: {get_resource: network_config_service}
         - config: {get_resource: network_service}
         - config: {get_resource: kube_system_namespace_service}
+        - config: {get_resource: kube_dns_service}
         - config: {get_resource: enable_kube_podmaster}
         - config: {get_resource: enable_kube_proxy}
         - config: {get_resource: kube_ui_service}
