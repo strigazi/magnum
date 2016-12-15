@@ -162,7 +162,7 @@ resources:
 
   master_wait_condition:
     type: "OS::Heat::WaitCondition"
-    depends_on: swarm_master
+    depends_on: swarm-master
     properties:
       handle: {get_resource: master_wait_handle}
       timeout: 6000
@@ -386,7 +386,7 @@ resources:
   # side the swarm agent.
   #
 
-  swarm_master:
+  swarm-master:
     type: "OS::Nova::Server"
     properties:
       image:
@@ -454,7 +454,7 @@ resources:
   docker_volume_attach:
     type: Magnum::Optional::Cinder::VolumeAttachment
     properties:
-      instance_uuid: {get_resource: swarm_master}
+      instance_uuid: {get_resource: swarm-master}
       volume_id: {get_resource: docker_volume}
       mountpoint: /dev/vdb
 

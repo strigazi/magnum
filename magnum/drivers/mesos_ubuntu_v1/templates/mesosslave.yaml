@@ -138,7 +138,7 @@ resources:
 
   slave_wait_condition:
     type: OS::Heat::WaitCondition
-    depends_on: mesos_slave
+    depends_on: mesos-slave
     properties:
       handle: {get_resource: slave_wait_handle}
       timeout: {get_param: wait_condition_timeout}
@@ -235,7 +235,7 @@ resources:
   # a single Mesos slave.
   #
 
-  mesos_slave:
+  mesos-slave:
     type: OS::Nova::Server
     properties:
       image: {get_param: server_image}

@@ -168,7 +168,7 @@ resources:
 
   node_wait_condition:
     type: "OS::Heat::WaitCondition"
-    depends_on: swarm_node
+    depends_on: swarm-node
     properties:
       handle: {get_resource: node_wait_handle}
       timeout: 6000
@@ -350,7 +350,7 @@ resources:
         - config: {get_resource: cfn_signal}
         - config: {get_resource: volume_service}
 
-  swarm_node:
+  swarm-node:
     type: "OS::Nova::Server"
     properties:
       image:
@@ -402,7 +402,7 @@ resources:
   docker_volume_attach:
     type: Magnum::Optional::Cinder::VolumeAttachment
     properties:
-      instance_uuid: {get_resource: swarm_node}
+      instance_uuid: {get_resource: swarm-node}
       volume_id: {get_resource: docker_volume}
       mountpoint: /dev/vdb
 

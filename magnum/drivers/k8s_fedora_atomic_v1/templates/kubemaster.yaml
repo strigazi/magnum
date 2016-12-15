@@ -190,7 +190,7 @@ resources:
 
   master_wait_condition:
     type: OS::Heat::WaitCondition
-    depends_on: kube_master
+    depends_on: kube-master
     properties:
       handle: {get_resource: master_wait_handle}
       timeout: {get_param: wait_condition_timeout}
@@ -404,7 +404,7 @@ resources:
   # a single kubernetes master.
   #
 
-  kube_master:
+  kube-master:
     type: OS::Nova::Server
     properties:
       image: {get_param: server_image}
@@ -466,7 +466,7 @@ resources:
   docker_volume_attach:
     type: Magnum::Optional::Cinder::VolumeAttachment
     properties:
-      instance_uuid: {get_resource: kube_master}
+      instance_uuid: {get_resource: kube-master}
       volume_id: {get_resource: docker_volume}
       mountpoint: /dev/vdb
 

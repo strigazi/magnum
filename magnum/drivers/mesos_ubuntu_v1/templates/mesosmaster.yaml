@@ -50,7 +50,7 @@ resources:
   # Mesos master server.
   #
 
-  mesos_master:
+  mesos-master:
     type: OS::Nova::Server
     properties:
       image: {get_param: server_image}
