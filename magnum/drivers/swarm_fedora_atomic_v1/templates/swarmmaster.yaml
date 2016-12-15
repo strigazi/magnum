@@ -327,6 +327,12 @@ resources:
           params:
             "$NODE_SERVICES": "etcd docker.socket swarm-manager"
 
+  install_cern_certs:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/fragments/install-cern-certs.sh}
+
   cfn_signal:
     type: "OS::Heat::SoftwareConfig"
     properties:
@@ -370,6 +376,7 @@ resources:
         - config: {get_resource: write_swarm_master_service}
         - config: {get_resource: add_proxy}
         - config: {get_resource: enable_services}
+        - config: {get_resource: install_cern_certs}
         - config: {get_resource: cfn_signal}
         - config: {get_resource: volume_service}
 

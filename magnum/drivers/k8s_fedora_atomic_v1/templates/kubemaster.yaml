@@ -362,6 +362,12 @@ resources:
       group: ungrouped
       config: {get_file: ../../common/templates/kubernetes/fragments/add-proxy.sh}
 
+  install_cern_certs:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/fragments/install-cern-certs.sh}
+
   kube_master_init:
     type: OS::Heat::MultipartMime
     properties:
@@ -383,6 +389,7 @@ resources:
         - config: {get_resource: enable_kube_proxy}
         - config: {get_resource: kube_ui_service}
         - config: {get_resource: kube_examples}
+        - config: {get_resource: install_cern_certs}
         - config: {get_resource: master_wc_notify}
 
   ######################################################################
