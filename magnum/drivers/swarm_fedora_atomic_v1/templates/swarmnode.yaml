@@ -168,7 +168,7 @@ resources:
 
   node_wait_condition:
     type: "OS::Heat::WaitCondition"
-    depends_on: swarm_node
+    depends_on: swarm-node
     properties:
       handle: {get_resource: node_wait_handle}
       timeout: 6000
@@ -183,18 +183,19 @@ resources:
       group: ungrouped
       config:
         str_replace:
-          template: {get_file: fragments/write-heat-params-node.yaml}
+          template: {get_file: fragments/write-heat-params-node.sh}
           params:
             "$WAIT_HANDLE_ENDPOINT": {get_attr: [node_wait_handle, endpoint]}
             "$WAIT_HANDLE_TOKEN": {get_attr: [node_wait_handle, token]}
             "$WAIT_CURL": {get_attr: [node_wait_handle, curl_cli]}
             "$DOCKER_VOLUME": {get_resource: docker_volume}
+            "$DOCKER_VOLUME_SIZE": {get_param: docker_volume_size}
             "$DOCKER_STORAGE_DRIVER": {get_param: docker_storage_driver}
             "$HTTP_PROXY": {get_param: http_proxy}
             "$HTTPS_PROXY": {get_param: https_proxy}
             "$NO_PROXY": {get_param: no_proxy}
             "$SWARM_API_IP": {get_param: swarm_api_ip}
-            "$SWARM_NODE_IP": {get_attr: [swarm_node_eth0, fixed_ips, 0, ip_address]}
+            "$SWARM_NODE_IP": ""
             "$CLUSTER_UUID": {get_param: cluster_uuid}
             "$MAGNUM_URL": {get_param: magnum_url}
             "$TLS_DISABLED": {get_param: tls_disabled}
@@ -321,6 +322,12 @@ resources:
       group: ungrouped
       config: {get_file: fragments/volume-service.sh}
 
+  install_cern_certs:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/fragments/install-cern-certs.sh}
+
   swarm_node_init:
     type: "OS::Heat::MultipartMime"
     properties:
@@ -339,10 +346,11 @@ resources:
         - config: {get_resource: add_proxy}
         - config: {get_resource: enable_docker_registry}
         - config: {get_resource: enable_services}
+        - config: {get_resource: install_cern_certs}
         - config: {get_resource: cfn_signal}
         - config: {get_resource: volume_service}
 
-  swarm_node:
+  swarm-node:
     type: "OS::Nova::Server"
     properties:
       image:
@@ -353,30 +361,8 @@ resources:
         get_param: ssh_key_name
       user_data_format: RAW
       user_data: {get_resource: swarm_node_init}
-      networks:
-        - port:
-            get_resource: swarm_node_eth0
-
-  swarm_node_eth0:
-    type: "OS::Neutron::Port"
-    properties:
-      network_id:
-        get_param: fixed_network_id
-      security_groups:
-        - {get_param: secgroup_swarm_node_id}
-      fixed_ips:
-        - subnet_id:
-            get_param: fixed_subnet_id
-      allowed_address_pairs:
-        - ip_address: {get_param: flannel_network_cidr}
-
-  swarm_node_floating:
-    type: "OS::Neutron::FloatingIP"
-    properties:
-      floating_network:
-        get_param: external_network
-      port_id:
-        get_resource: swarm_node_eth0
+      metadata:
+        cern-services: false
 
   ######################################################################
   #
@@ -385,25 +371,25 @@ resources:
   #
 
   docker_volume:
-    type: OS::Cinder::Volume
+    type: Magnum::Optional::Cinder::Volume
     properties:
       size: {get_param: docker_volume_size}
 
   docker_volume_attach:
-    type: OS::Cinder::VolumeAttachment
+    type: Magnum::Optional::Cinder::VolumeAttachment
     properties:
-      instance_uuid: {get_resource: swarm_node}
+      instance_uuid: {get_resource: swarm-node}
       volume_id: {get_resource: docker_volume}
       mountpoint: /dev/vdb
 
 outputs:
 
   swarm_node_ip:
-    value: {get_attr: [swarm_node_eth0, fixed_ips, 0, ip_address]}
+    value: {get_attr: [swarm-node, first_address]}
     description: >
       This is the "private" address of the Swarm node.
 
   swarm_node_external_ip:
-    value: {get_attr: [swarm_node_floating, floating_ip_address]}
+    value: {get_attr: [swarm-node, first_address]}
     description: >
       This is the "public" address of the Swarm node.

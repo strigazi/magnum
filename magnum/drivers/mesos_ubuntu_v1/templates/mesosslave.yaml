@@ -138,18 +138,10 @@ resources:
 
   slave_wait_condition:
     type: OS::Heat::WaitCondition
-    depends_on: mesos_slave
+    depends_on: mesos-slave
     properties:
       handle: {get_resource: slave_wait_handle}
       timeout: {get_param: wait_condition_timeout}
-
-  secgroup_all_open:
-    type: OS::Neutron::SecurityGroup
-    properties:
-      rules:
-        - protocol: icmp
-        - protocol: tcp
-        - protocol: udp
 
   ######################################################################
   #
@@ -235,7 +227,7 @@ resources:
   # a single Mesos slave.
   #
 
-  mesos_slave:
+  mesos-slave:
     type: OS::Nova::Server
     properties:
       image: {get_param: server_image}
@@ -243,33 +235,16 @@ resources:
       key_name: {get_param: ssh_key_name}
       user_data_format: RAW
       user_data: {get_resource: mesos_slave_init}
-      networks:
-        - port: {get_resource: mesos_slave_eth0}
-
-  mesos_slave_eth0:
-    type: OS::Neutron::Port
-    properties:
-      network: {get_param: fixed_network}
-      security_groups:
-        - get_resource: secgroup_all_open
-        - get_param: secgroup_base_id
-      fixed_ips:
-        - subnet: {get_param: fixed_subnet}
-      replacement_policy: AUTO
-
-  mesos_slave_floating:
-    type: OS::Neutron::FloatingIP
-    properties:
-      floating_network: {get_param: external_network}
-      port_id: {get_resource: mesos_slave_eth0}
+      metadata:
+        cern-services: false
 
 outputs:
 
   mesos_slave_ip:
-    value: {get_attr: [mesos_slave_eth0, fixed_ips, 0, ip_address]}
+    value: {get_attr: [mesos-slave, first_address]}
     description: >
       This is the "private" address of the Mesos slave node.
   mesos_slave_external_ip:
-    value: {get_attr: [mesos_slave_floating, floating_ip_address]}
+    value: {get_attr: [mesos-slave, first_address]}
     description: >
       This is the "public" address of the Mesos slave node.

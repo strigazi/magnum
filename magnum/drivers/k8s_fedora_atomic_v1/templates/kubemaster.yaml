@@ -190,24 +190,10 @@ resources:
 
   master_wait_condition:
     type: OS::Heat::WaitCondition
-    depends_on: kube_master
+    depends_on: kube-master
     properties:
       handle: {get_resource: master_wait_handle}
       timeout: {get_param: wait_condition_timeout}
-
-  ######################################################################
-  #
-  # resource that exposes the IPs of either the kube master or the API
-  # LBaaS pool depending on whether LBaaS is enabled for the cluster.
-  #
-
-  api_address_switch:
-    type: Magnum::ApiGatewaySwitcher
-    properties:
-      pool_public_ip: {get_param: api_public_address}
-      pool_private_ip: {get_param: api_private_address}
-      master_public_ip: {get_attr: [kube_master_floating, floating_ip_address]}
-      master_private_ip: {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
 
   ######################################################################
   #
@@ -221,15 +207,16 @@ resources:
       group: ungrouped
       config:
         str_replace:
-          template: {get_file: ../../common/templates/kubernetes/fragments/write-heat-params-master.yaml}
+          template: {get_file: ../../common/templates/kubernetes/fragments/write-heat-params-master.sh}
           params:
-            "$KUBE_API_PUBLIC_ADDRESS": {get_attr: [api_address_switch, public_ip]}
-            "$KUBE_API_PRIVATE_ADDRESS": {get_attr: [api_address_switch, private_ip]}
+            "$KUBE_API_PUBLIC_ADDRESS": ""
+            "$KUBE_API_PRIVATE_ADDRESS": ""
             "$KUBE_API_PORT": {get_param: kubernetes_port}
-            "$KUBE_NODE_PUBLIC_IP": {get_attr: [kube_master_floating, floating_ip_address]}
-            "$KUBE_NODE_IP": {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
+            "$KUBE_NODE_PUBLIC_IP": ""
+            "$KUBE_NODE_IP": ""
             "$KUBE_ALLOW_PRIV": {get_param: kube_allow_priv}
             "$DOCKER_VOLUME": {get_resource: docker_volume}
+            "$DOCKER_VOLUME_SIZE": {get_param: docker_volume_size}
             "$DOCKER_STORAGE_DRIVER": {get_param: docker_storage_driver}
             "$NETWORK_DRIVER": {get_param: network_driver}
             "$FLANNEL_NETWORK_CIDR": {get_param: flannel_network_cidr}
@@ -331,6 +318,12 @@ resources:
       group: ungrouped
       config: {get_file: ../../common/templates/kubernetes/fragments/kube-system-namespace-service.sh}
 
+  kube_dns_service:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/kubernetes/fragments/kube-dns-service.sh}
+
   kube_ui_service:
     type: OS::Heat::SoftwareConfig
     properties:
@@ -361,6 +354,12 @@ resources:
       group: ungrouped
       config: {get_file: ../../common/templates/kubernetes/fragments/add-proxy.sh}
 
+  install_cern_certs:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/fragments/install-cern-certs.sh}
+
   kube_master_init:
     type: OS::Heat::MultipartMime
     properties:
@@ -378,10 +377,12 @@ resources:
         - config: {get_resource: network_config_service}
         - config: {get_resource: network_service}
         - config: {get_resource: kube_system_namespace_service}
+        - config: {get_resource: kube_dns_service}
         - config: {get_resource: enable_kube_podmaster}
         - config: {get_resource: enable_kube_proxy}
         - config: {get_resource: kube_ui_service}
         - config: {get_resource: kube_examples}
+        - config: {get_resource: install_cern_certs}
         - config: {get_resource: master_wc_notify}
 
   ######################################################################
@@ -389,7 +390,7 @@ resources:
   # a single kubernetes master.
   #
 
-  kube_master:
+  kube-master:
     type: OS::Nova::Server
     properties:
       image: {get_param: server_image}
@@ -397,43 +398,8 @@ resources:
       key_name: {get_param: ssh_key_name}
       user_data_format: RAW
       user_data: {get_resource: kube_master_init}
-      networks:
-        - port: {get_resource: kube_master_eth0}
-
-  kube_master_eth0:
-    type: OS::Neutron::Port
-    properties:
-      network: {get_param: fixed_network}
-      security_groups:
-        - {get_param: secgroup_base_id}
-        - {get_param: secgroup_kube_master_id}
-      fixed_ips:
-        - subnet: {get_param: fixed_subnet}
-      allowed_address_pairs:
-        - ip_address: {get_param: flannel_network_cidr}
-      replacement_policy: AUTO
-
-  kube_master_floating:
-    type: Magnum::Optional::KubeMaster::Neutron::FloatingIP
-    properties:
-      floating_network: {get_param: external_network}
-      port_id: {get_resource: kube_master_eth0}
-
-  api_pool_member:
-    type: Magnum::Optional::Neutron::LBaaS::PoolMember
-    properties:
-      pool: {get_param: api_pool_id}
-      address: {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
-      subnet: { get_param: fixed_subnet }
-      protocol_port: {get_param: kubernetes_port}
-
-  etcd_pool_member:
-    type: Magnum::Optional::Neutron::LBaaS::PoolMember
-    properties:
-      pool: {get_param: etcd_pool_id}
-      address: {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
-      subnet: { get_param: fixed_subnet }
-      protocol_port: 2379
+      metadata:
+        cern-services: false
 
   ######################################################################
   #
@@ -442,25 +408,25 @@ resources:
   #
 
   docker_volume:
-    type: OS::Cinder::Volume
+    type: Magnum::Optional::Cinder::Volume
     properties:
       size: {get_param: docker_volume_size}
 
   docker_volume_attach:
-    type: OS::Cinder::VolumeAttachment
+    type: Magnum::Optional::Cinder::VolumeAttachment
     properties:
-      instance_uuid: {get_resource: kube_master}
+      instance_uuid: {get_resource: kube-master}
       volume_id: {get_resource: docker_volume}
       mountpoint: /dev/vdb
 
 outputs:
 
   kube_master_ip:
-    value: {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
+    value: {get_attr: [kube-master, first_address]}
     description: >
       This is the "private" IP address of the Kubernetes master node.
 
   kube_master_external_ip:
-    value: {get_attr: [kube_master_floating, floating_ip_address]}
+    value: {get_attr: [kube-master, first_address]}
     description: >
       This is the "public" IP address of the Kubernetes master node.

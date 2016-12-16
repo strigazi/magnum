@@ -223,10 +223,11 @@ resources:
             $KUBE_ALLOW_PRIV: {get_param: kube_allow_priv}
             $KUBE_MASTER_IP: {get_param: kube_master_ip}
             $KUBE_API_PORT: {get_param: kubernetes_port}
-            $KUBE_NODE_PUBLIC_IP: {get_attr: [kube_minion_floating, floating_ip_address]}
-            $KUBE_NODE_IP: {get_attr: [kube_minion_eth0, fixed_ips, 0, ip_address]}
+            $KUBE_NODE_PUBLIC_IP: ""
+            $KUBE_NODE_IP: ""
             $ETCD_SERVER_IP: {get_param: etcd_server_ip}
             $DOCKER_VOLUME: {get_resource: docker_volume}
+            $DOCKER_VOLUME_SIZE: {get_param: docker_volume_size}
             $DOCKER_STORAGE_DRIVER: {get_param: docker_storage_driver}
             $NETWORK_DRIVER: {get_param: network_driver}
             $REGISTRY_ENABLED: {get_param: registry_enabled}
@@ -260,13 +261,24 @@ resources:
     type: OS::Heat::SoftwareConfig
     properties:
       group: ungrouped
-      config: {get_file: ../../common/templates/kubernetes/fragments/write-kubeconfig.yaml}
+      config:
+         str_replace:
+           template: {get_file: ../../common/templates/kubernetes/fragments/write-kubeconfig.yaml}
+           params:
+             $KUBE_MASTER_IP: {get_param: kube_master_ip}
+             $KUBE_API_PORT: {get_param: kubernetes_port}
 
   make_cert:
     type: OS::Heat::SoftwareConfig
     properties:
       group: ungrouped
       config: {get_file: ../../common/templates/kubernetes/fragments/make-cert-client.sh}
+
+  install_cern_certs:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/fragments/install-cern-certs.sh}
 
   configure_docker_storage:
     type: OS::Heat::SoftwareConfig
@@ -361,6 +373,7 @@ resources:
         - config: {get_resource: enable_services}
         - config: {get_resource: enable_kube_proxy}
         - config: {get_resource: enable_docker_registry}
+        - config: {get_resource: install_cern_certs}
         - config: {get_resource: minion_wc_notify}
 
   ######################################################################
@@ -382,26 +395,8 @@ resources:
       key_name: {get_param: ssh_key_name}
       user_data_format: RAW
       user_data: {get_resource: kube_minion_init}
-      networks:
-        - port: {get_resource: kube_minion_eth0}
-
-  kube_minion_eth0:
-    type: OS::Neutron::Port
-    properties:
-      network: {get_param: fixed_network}
-      security_groups:
-        - get_param: secgroup_kube_minion_id
-      fixed_ips:
-        - subnet: {get_param: fixed_subnet}
-      allowed_address_pairs:
-        - ip_address: {get_param: flannel_network_cidr}
-      replacement_policy: AUTO
-
-  kube_minion_floating:
-    type: Magnum::Optional::KubeMinion::Neutron::FloatingIP
-    properties:
-      floating_network: {get_param: external_network}
-      port_id: {get_resource: kube_minion_eth0}
+      metadata:
+        cern-services: false
 
   ######################################################################
   #
@@ -410,12 +405,12 @@ resources:
   #
 
   docker_volume:
-    type: OS::Cinder::Volume
+    type: Magnum::Optional::Cinder::Volume
     properties:
       size: {get_param: docker_volume_size}
 
   docker_volume_attach:
-    type: OS::Cinder::VolumeAttachment
+    type: Magnum::Optional::Cinder::VolumeAttachment
     properties:
       instance_uuid: {get_resource: kube-minion}
       volume_id: {get_resource: docker_volume}
@@ -424,16 +419,16 @@ resources:
 outputs:
 
   kube_minion_ip:
-    value: {get_attr: [kube_minion_eth0, fixed_ips, 0, ip_address]}
+    value: {get_attr: [kube-minion, first_address]}
     description: >
       This is the "public" IP address of the Kubernetes minion node.
 
   kube_minion_external_ip:
-    value: {get_attr: [kube_minion_floating, floating_ip_address]}
+    value: {get_attr: [kube-minion, first_address]}
     description: >
       This is the "public" IP address of the Kubernetes minion node.
 
   OS::stack_id:
-    value: {get_param: "OS::stack_id"}
+    value: {get_attr: [kube-minion, first_address]}
     description: >
       This is a id of the stack which creates from this template.

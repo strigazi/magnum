@@ -162,30 +162,10 @@ resources:
 
   master_wait_condition:
     type: "OS::Heat::WaitCondition"
-    depends_on: swarm_master
+    depends_on: swarm-master
     properties:
       handle: {get_resource: master_wait_handle}
       timeout: 6000
-
-  ######################################################################
-  #
-  # resource that exposes the IPs of either the Swarm master or the API
-  # LBaaS pool depending on whether LBaaS is enabled for the cluster.
-  #
-
-  api_address_switch:
-    type: Magnum::ApiGatewaySwitcher
-    properties:
-      pool_public_ip: {get_param: api_ip_address}
-      pool_private_ip: {get_param: swarm_api_ip}
-      master_public_ip: {get_attr: [swarm_master_floating, floating_ip_address]}
-      master_private_ip: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
-
-  etcd_address_switch:
-    type: Magnum::ApiGatewaySwitcher
-    properties:
-      pool_private_ip: {get_param: etcd_server_ip}
-      master_private_ip: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
 
   ######################################################################
   #
@@ -198,19 +178,20 @@ resources:
       group: ungrouped
       config:
         str_replace:
-          template: {get_file: fragments/write-heat-params-master.yaml}
+          template: {get_file: fragments/write-heat-params-master.sh}
           params:
             "$WAIT_HANDLE_ENDPOINT": {get_attr: [master_wait_handle, endpoint]}
             "$WAIT_HANDLE_TOKEN": {get_attr: [master_wait_handle, token]}
             "$WAIT_CURL": {get_attr: [master_wait_handle, curl_cli]}
             "$DOCKER_VOLUME": {get_resource: docker_volume}
+            "$DOCKER_VOLUME_SIZE": {get_param: docker_volume_size}
             "$DOCKER_STORAGE_DRIVER": {get_param: docker_storage_driver}
             "$ETCD_DISCOVERY_URL": {get_param: discovery_url}
             "$HTTP_PROXY": {get_param: http_proxy}
             "$HTTPS_PROXY": {get_param: https_proxy}
             "$NO_PROXY": {get_param: no_proxy}
-            "$SWARM_API_IP": {get_attr: [api_address_switch, private_ip]}
-            "$SWARM_NODE_IP": {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
+            "$SWARM_API_IP": {get_param: swarm_api_ip}
+            "$SWARM_NODE_IP": ""
             "$CLUSTER_UUID": {get_param: cluster_uuid}
             "$MAGNUM_URL": {get_param: magnum_url}
             "$TLS_DISABLED": {get_param: tls_disabled}
@@ -218,8 +199,8 @@ resources:
             "$FLANNEL_NETWORK_CIDR": {get_param: flannel_network_cidr}
             "$FLANNEL_NETWORK_SUBNETLEN": {get_param: flannel_network_subnetlen}
             "$FLANNEL_BACKEND": {get_param: flannel_backend}
-            "$ETCD_SERVER_IP": {get_attr: [etcd_address_switch, private_ip]}
-            "$API_IP_ADDRESS": {get_attr: [api_address_switch, public_ip]}
+            "$ETCD_SERVER_IP": ""
+            "$API_IP_ADDRESS": ""
             "$SWARM_VERSION": {get_param: swarm_version}
             "$TRUSTEE_USER_ID": {get_param: trustee_user_id}
             "$TRUSTEE_PASSWORD": {get_param: trustee_password}
@@ -306,15 +287,9 @@ resources:
         str_replace:
           template: {get_file: fragments/write-swarm-master-service.sh}
           params:
-            "$ETCD_SERVER_IP": {get_attr: [etcd_address_switch, private_ip]}
-            "$NODE_IP": {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
             "$WAIT_HANDLE_ENDPOINT": {get_attr: [master_wait_handle, endpoint]}
             "$WAIT_HANDLE_TOKEN": {get_attr: [master_wait_handle, token]}
-            "$HTTP_PROXY": {get_param: http_proxy}
-            "$HTTPS_PROXY": {get_param: https_proxy}
-            "$NO_PROXY": {get_param: no_proxy}
-            "$TLS_DISABLED": {get_param: tls_disabled}
-            "$SWARM_VERSION": {get_param: swarm_version}
+            # only replace $WAIT_HANDLE, others are sourced from heat-params
 
   enable_services:
     type: "OS::Heat::SoftwareConfig"
@@ -325,6 +300,12 @@ resources:
           template: {get_file: fragments/enable-services.sh}
           params:
             "$NODE_SERVICES": "etcd docker.socket swarm-manager"
+
+  install_cern_certs:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/fragments/install-cern-certs.sh}
 
   cfn_signal:
     type: "OS::Heat::SoftwareConfig"
@@ -369,6 +350,7 @@ resources:
         - config: {get_resource: write_swarm_master_service}
         - config: {get_resource: add_proxy}
         - config: {get_resource: enable_services}
+        - config: {get_resource: install_cern_certs}
         - config: {get_resource: cfn_signal}
         - config: {get_resource: volume_service}
 
@@ -378,7 +360,7 @@ resources:
   # side the swarm agent.
   #
 
-  swarm_master:
+  swarm-master:
     type: "OS::Nova::Server"
     properties:
       image:
@@ -389,46 +371,8 @@ resources:
         get_param: ssh_key_name
       user_data_format: RAW
       user_data: {get_resource: swarm_master_init}
-      networks:
-        - port:
-            get_resource: swarm_master_eth0
-
-  swarm_master_eth0:
-    type: "OS::Neutron::Port"
-    properties:
-      network_id:
-        get_param: fixed_network_id
-      security_groups:
-        - {get_param: secgroup_swarm_master_id}
-      fixed_ips:
-        - subnet_id:
-            get_param: fixed_subnet_id
-      allowed_address_pairs:
-        - ip_address: {get_param: flannel_network_cidr}
-
-  swarm_master_floating:
-    type: "OS::Neutron::FloatingIP"
-    properties:
-      floating_network:
-        get_param: external_network
-      port_id:
-        get_resource: swarm_master_eth0
-
-  api_pool_member:
-    type: Magnum::Optional::Neutron::LBaaS::PoolMember
-    properties:
-      pool: {get_param: api_pool_id}
-      address: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
-      subnet: { get_param: fixed_subnet_id }
-      protocol_port: {get_param: swarm_port}
-
-  etcd_pool_member:
-    type: Magnum::Optional::Neutron::LBaaS::PoolMember
-    properties:
-      pool: {get_param: etcd_pool_id}
-      address: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
-      subnet: { get_param: fixed_subnet_id }
-      protocol_port: 2379
+      metadata:
+        cern-services: false
 
   ######################################################################
   #
@@ -437,25 +381,25 @@ resources:
   #
 
   docker_volume:
-    type: OS::Cinder::Volume
+    type: Magnum::Optional::Cinder::Volume
     properties:
       size: {get_param: docker_volume_size}
 
   docker_volume_attach:
-    type: OS::Cinder::VolumeAttachment
+    type: Magnum::Optional::Cinder::VolumeAttachment
     properties:
-      instance_uuid: {get_resource: swarm_master}
+      instance_uuid: {get_resource: swarm-master}
       volume_id: {get_resource: docker_volume}
       mountpoint: /dev/vdb
 
 outputs:
 
   swarm_master_ip:
-    value: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
+    value: {get_attr: [swarm-master, first_address]}
     description: >
       This is the "private" addresses of all the Swarm master.
 
   swarm_master_external_ip:
-    value: {get_attr: [swarm_master_floating, floating_ip_address]}
+    value: {get_attr: [swarm-master, first_address]}
     description: >
       This is the "public" ip addresses of Swarm master.

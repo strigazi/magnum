@@ -10,6 +10,11 @@ myip=$(ip addr show eth0 |
 # Fix /etc/hosts
 sed -i "s/127.0.1.1/$myip/" /etc/hosts
 
+ # 2016/08/18 benoel
+ # When started with cern-services false, Marathon does not advertise itself
+ # on the correct IP. It uses 127.0.0.1
+ echo "LIBPROCESS_IP=$myip" > /etc/default/marathon
+
 ######################################################################
 #
 # Configure ZooKeeper
