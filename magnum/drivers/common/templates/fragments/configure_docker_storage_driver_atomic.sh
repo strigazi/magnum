@@ -1,19 +1,20 @@
 # This file contains docker storage drivers configuration for fedora
 # atomic hosts. Currently, devicemapper and overlay are supported.
 
-# Remove any existing docker-storage configuration. In case of an
-# existing configuration, docker-storage-setup will fail.
-clear_docker_storage_congiguration () {
+# - Remove any existing docker-storage configuration. In case of an
+#   existing configuration, docker-storage-setup will fail.
+# - Remove the current storage graph.
+clear_docker_storage () {
     if [ -f /etc/sysconfig/docker-storage ]; then
         sed -i "/^DOCKER_STORAGE_OPTIONS=/ s/=.*/=/" /etc/sysconfig/docker-storage
     fi
+
+    rm -rf /var/lib/docker/*
 }
 
 # Configure docker storage with xfs as backing filesystem.
 configure_overlay () {
-    clear_docker_storage_congiguration
-
-    rm -rf /var/lib/docker/*
+    clear_docker_storage
 
     if [ -n "$DOCKER_VOLUME_SIZE" ] && [ "$DOCKER_VOLUME_SIZE" -gt 0 ]; then
         mkfs.xfs -f ${device_path}
@@ -31,7 +32,7 @@ configure_overlay () {
 
 # Configure docker storage with devicemapper using direct LVM
 configure_devicemapper () {
-    clear_docker_storage_congiguration
+    clear_docker_storage
 
     if [ -n "$DOCKER_VOLUME_SIZE" ] && [ "$DOCKER_VOLUME_SIZE" -gt 0 ]; then
         pvcreate -f ${device_path}

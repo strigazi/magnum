@@ -1,5 +1,10 @@
 #!/bin/sh
 
+set -x
+
+echo "stopping docker"
+systemctl stop docker
+
 echo "starting services"
 systemctl daemon-reload
 for service in $NODE_SERVICES; do
