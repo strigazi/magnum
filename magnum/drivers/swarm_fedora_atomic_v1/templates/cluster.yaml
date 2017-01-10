@@ -226,6 +226,18 @@ parameters:
       other hosts are using the volume
     default: "false"
 
+  cvmfs_enabled:
+    type: boolean
+    description: >
+      Indicates whether cvmfs support should be enabled in the cluster.
+    default: true
+
+  cvmfs_tag:
+    type: string
+    description: >
+      The tag to use for the docker-volume-cvmfs container.
+    default: "latest"
+
 
 resources:
 
@@ -321,6 +333,8 @@ resources:
           registry_chunksize: {get_param: registry_chunksize}
           volume_driver: {get_param: volume_driver}
           rexray_preempt: {get_param: rexray_preempt}
+          cvmfs_enabled: {get_param: cvmfs_enabled}
+          cvmfs_tag: {get_param: cvmfs_tag}
 
 outputs:
 

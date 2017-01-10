@@ -263,6 +263,18 @@ parameters:
     description: insecure registry url
     default: ""
 
+  cvmfs_enabled:
+    type: boolean
+    description: >
+      Indicates whether cvmfs support should be enabled in the cluster.
+    default: true
+
+  cvmfs_tag:
+    type: string
+    description: >
+      The tag to use for the docker-volume-cvmfs container.
+    default: "latest"
+
 resources:
 
   ######################################################################
@@ -373,6 +385,8 @@ resources:
           trust_id: {get_param: trust_id}
           auth_url: {get_param: auth_url}
           insecure_registry_url: {get_param: insecure_registry_url}
+          cvmfs_enabled: {get_param: cvmfs_enabled}
+          cvmfs_tag: {get_param: cvmfs_tag}
 
 outputs:
 

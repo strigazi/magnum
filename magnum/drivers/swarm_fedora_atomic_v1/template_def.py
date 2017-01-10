@@ -100,7 +100,8 @@ class AtomicSwarmTemplateDefinition(template_def.BaseTemplateDefinition):
         extra_params['magnum_url'] = osc.magnum_url()
 
         label_list = ['flannel_network_cidr', 'flannel_backend',
-                      'flannel_network_subnetlen', 'rexray_preempt']
+                      'flannel_network_subnetlen', 'rexray_preempt',
+                      'cvmfs_enabled', 'cvmfs_tag']
 
         extra_params['auth_url'] = context.auth_url
 

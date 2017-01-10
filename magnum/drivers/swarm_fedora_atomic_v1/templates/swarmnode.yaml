@@ -161,6 +161,18 @@ parameters:
       other hosts are using the volume
     default: "false"
 
+  cvmfs_enabled:
+    type: boolean
+    description: >
+      Indicates whether cvmfs support should be enabled in the cluster.
+    default: true
+
+  cvmfs_tag:
+    type: string
+    description: >
+      The tag to use for the docker-volume-cvmfs container.
+    default: "latest"
+
 resources:
 
   node_wait_handle:
@@ -217,6 +229,8 @@ resources:
             "$REGISTRY_CHUNKSIZE": {get_param: registry_chunksize}
             "$VOLUME_DRIVER": {get_param: volume_driver}
             "$REXRAY_PREEMPT": {get_param: rexray_preempt}
+            "$CVMFS_ENABLED": {get_param: cvmfs_enabled}
+            "$CVMFS_TAG": {get_param: cvmfs_tag}
 
   remove_docker_key:
     type: "OS::Heat::SoftwareConfig"
@@ -328,6 +342,12 @@ resources:
       group: ungrouped
       config: {get_file: ../../common/templates/fragments/install-cern-certs.sh}
 
+  configure_docker_cvmfs:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/fragments/configure-cvmfs.sh}
+
   swarm_node_init:
     type: "OS::Heat::MultipartMime"
     properties:
@@ -347,8 +367,9 @@ resources:
         - config: {get_resource: enable_docker_registry}
         - config: {get_resource: enable_services}
         - config: {get_resource: install_cern_certs}
-        - config: {get_resource: cfn_signal}
         - config: {get_resource: volume_service}
+        - config: {get_resource: configure_docker_cvmfs}
+        - config: {get_resource: cfn_signal}
 
   swarm-node:
     type: "OS::Nova::Server"
