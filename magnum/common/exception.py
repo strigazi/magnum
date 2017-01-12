@@ -180,6 +180,10 @@ class InvalidSubnet(Invalid):
     message = _("Received invalid subnet %(subnet)s.")
 
 
+class DriverFieldMissing(Invalid):
+    message = _("Driver field is mandatory.")
+
+
 class HTTPNotFound(ResourceNotFound):
     pass
 

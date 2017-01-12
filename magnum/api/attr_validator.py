@@ -204,6 +204,9 @@ def validate_master_count(cluster, cluster_template):
         raise exception.InvalidParameterValue(_(
             "master_count must be 1 when master_lb_enabled is False"))
 
+def validate_driver(cluster_template):
+    pass
+
 
 # Dictionary that maintains a list of validation functions
 validators = {'image_id': validate_image,
