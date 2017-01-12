@@ -21,6 +21,7 @@ import pecan
 from magnum.api import utils as api_utils
 from magnum.common import exception
 import magnum.conf
+from magnum.drivers.common import driver
 from magnum.i18n import _
 from magnum import objects
 
@@ -61,6 +62,26 @@ def enforce_cluster_types(*cluster_types):
     return wrapper
 
 
+def enforce_cluster_driver():
+    """Enforce that the given driver exists."""
+    @decorator.decorator
+    def wrapper(func, *args, **kwargs):
+        cluster_template = args[1]
+        _enforce_cluster_driver(cluster_template)
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def _enforce_cluster_driver(cluster_template):
+    _, cluster_drivers = driver.Driver.get_drivers()
+    for i in range(100):
+        print cluster_drivers
+    if cluster_template.driver not in cluster_drivers:
+        msg = 'Server type ''%(cluster_driver)s is not supported.' % {'cluster_driver': cluster_template.driver}
+        raise exception.InvalidParameterValue(_(msg))
+
+
 def enforce_network_driver_types_create():
     @decorator.decorator
     def wrapper(func, *args, **kwargs):
@@ -92,7 +113,11 @@ def enforce_network_driver_types_update():
 
 
 def _enforce_network_driver_types(cluster_template):
-    validator = Validator.get_coe_validator(cluster_template.coe)
+    validator = Validator.get_driver_validator(cluster_template.driver)
+    #if cluster_template.coe:
+    #    validator = Validator.get_coe_validator(cluster_template.coe)
+    #else:
+    #    validator = Validator.get_driver_validator(cluster_template.driver)
     if not cluster_template.network_driver:
         cluster_template.network_driver = validator.default_network_driver
     validator.validate_network_driver(cluster_template.network_driver)
@@ -152,7 +177,11 @@ def enforce_volume_driver_types_update():
 
 
 def _enforce_volume_driver_types(cluster_template):
-    validator = Validator.get_coe_validator(cluster_template['coe'])
+    validator = Validator.get_driver_validator(cluster_template['driver'])
+    #if cluster_template.coe:
+    #    validator = Validator.get_coe_validator(cluster_template.coe)
+    #else:
+    #    validator = Validator.get_driver_validator(cluster_template.driver)
     if not cluster_template.get('volume_driver'):
         return
     validator.validate_volume_driver(cluster_template['volume_driver'])
@@ -193,6 +222,11 @@ class Validator(object):
         else:
             raise exception.InvalidParameterValue(
                 _('Requested COE type %s is not supported.') % coe)
+
+    @classmethod
+    def get_driver_validator(cls, driver_name):
+        cluster_driver = driver.Driver.get_driver(driver_name)
+        return cluster_driver.get_validator()
 
     @classmethod
     def validate_network_driver(cls, driver):

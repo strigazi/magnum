@@ -59,6 +59,7 @@ class Driver(object):
 
         if not cls.definitions or not cls.drivers:
             cls.definitions = dict()
+            cls.drivers = list()
             for entry_point, def_class in cls.load_entry_points():
                 for cluster_type in def_class().provides:
                     cluster_type_tuple = (cluster_type['server_type'],
@@ -68,8 +69,7 @@ class Driver(object):
                     l = cls.definitions.get(cluster_type_tuple, list())
                     l.append(entry_point.name)
 
-            cls.drivers = itertools.chain.from_iterable(
-                cls.definitions.values())
+                    cls.drivers.append(entry_point.name)
 
         return (cls.definitions, cls.drivers)
 
@@ -159,6 +159,15 @@ class Driver(object):
            Returns a list of cluster configurations supported by this driver
         '''
         raise NotImplementedError("Subclasses must implement 'provides'.")
+
+    @classmethod
+    @abc.abstractmethod
+    def get_validator(self):
+        '''return a the driver validator
+
+        :return: class
+        '''
+        raise NotImplementedError("Subclasses must implement 'get_validator'.")
 
     @abc.abstractmethod
     def create_cluster(self, context, cluster, cluster_create_timeout):

@@ -14,6 +14,7 @@
 
 from magnum.drivers.heat import driver
 from magnum.drivers.swarm_fedora_atomic_v1 import template_def
+from magnum.drivers.swarm_fedora_atomic_v1 import validator
 
 
 class Driver(driver.HeatDriver):
@@ -25,6 +26,9 @@ class Driver(driver.HeatDriver):
              'os': 'fedora-atomic',
              'coe': 'swarm'},
         ]
+
+    def get_validator(self):
+        return validator.SwarmValidator()
 
     def get_template_definition(self):
         return template_def.AtomicSwarmTemplateDefinition()

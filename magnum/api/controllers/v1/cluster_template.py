@@ -29,6 +29,7 @@ from magnum.common import clients
 from magnum.common import exception
 from magnum.common import name_generator
 from magnum.common import policy
+from magnum.drivers.common import driver
 from magnum import objects
 from magnum.objects import fields
 
@@ -329,6 +330,7 @@ class ClusterTemplatesController(base.Controller):
 
         return ClusterTemplate.convert_with_links(cluster_template)
 
+    @base.Controller.api_version("1.1", "1.3")
     @expose.expose(ClusterTemplate, body=ClusterTemplate, status_code=201)
     @validation.enforce_server_type()
     @validation.enforce_network_driver_types_create()
@@ -342,29 +344,81 @@ class ClusterTemplatesController(base.Controller):
         context = pecan.request.context
         policy.enforce(context, 'clustertemplate:create',
                        action='clustertemplate:create')
-        cluster_template_dict = cluster_template.as_dict()
+        ct_dict = cluster_template.as_dict()
         cli = clients.OpenStackClients(context)
-        attr_validator.validate_os_resources(context, cluster_template_dict)
-        image_data = attr_validator.validate_image(cli,
-                                                   cluster_template_dict[
-                                                       'image_id'])
-        cluster_template_dict['cluster_distro'] = image_data['os_distro']
-        cluster_template_dict['project_id'] = context.project_id
-        cluster_template_dict['user_id'] = context.user_id
+        attr_validator.validate_os_resources(context, ct_dict)
+        image_data = attr_validator.validate_image(cli, ct_dict['image_id'])
+        ct_dict['cluster_distro'] = image_data['os_distro']
+        if not ct_dict['coe']:
+            raise wsme.exc.ClientSideError("COE is mandatory.")
+        if ct_dict['driver']:
+            raise wsme.exc.ClientSideError("For the driver field, use "
+                                           "version 1.4 and above.")
+        ct_dict['driver'] = driver.Driver.get_driver_name(ct_dict['server_type'],
+                                                   ct_dict['cluster_distro'],
+                                                   ct_dict['coe'])
+        ct_dict['project_id'] = context.project_id
+        ct_dict['user_id'] = context.user_id
         # check permissions for making cluster_template public
-        if cluster_template_dict['public']:
+        if ct_dict['public']:
             if not policy.enforce(context, "clustertemplate:publish", None,
                                   do_raise=False):
                 raise exception.ClusterTemplatePublishDenied()
 
         # NOTE(yuywz): We will generate a random human-readable name for
         # cluster_template if the name is not specified by user.
-        arg_name = cluster_template_dict.get('name')
+        arg_name = ct_dict.get('name')
         name = arg_name or self._generate_name_for_cluster_template(context)
-        cluster_template_dict['name'] = name
+        ct_dict['name'] = name
 
         new_cluster_template = objects.ClusterTemplate(context,
-                                                       **cluster_template_dict)
+                                                       **ct_dict)
+        new_cluster_template.create()
+        # Set the HTTP Location Header
+        pecan.response.location = link.build_url('clustertemplates',
+                                                 new_cluster_template.uuid)
+        return ClusterTemplate.convert_with_links(new_cluster_template)
+
+    @base.Controller.api_version("1.4")
+    @expose.expose(ClusterTemplate, body=ClusterTemplate, status_code=201)
+    @validation.enforce_cluster_driver()
+    @validation.enforce_network_driver_types_create()
+    @validation.enforce_volume_driver_types_create()
+    @validation.enforce_volume_storage_size_create()
+    def post(self, cluster_template):
+        """Create a new ClusterTemplate.
+
+        :param cluster_template: a ClusterTemplate within the request body.
+        """
+        context = pecan.request.context
+        policy.enforce(context, 'clustertemplate:create',
+                       action='clustertemplate:create')
+        ct_dict = cluster_template.as_dict()
+        cli = clients.OpenStackClients(context)
+        attr_validator.validate_os_resources(context, ct_dict)
+        image_data = attr_validator.validate_image(cli, ct_dict['image_id'])
+        ct_dict['cluster_distro'] = image_data['os_distro']
+        if ct_dict['driver'] is None:
+            raise wsme.exc.ClientSideError("Driver is mandatory.")
+        if ct_dict['coe']:
+            raise wsme.exc.ClientSideError("You can't scpecify the coe "
+                                           "field, please select a driver.")
+        ct_dict['project_id'] = context.project_id
+        ct_dict['user_id'] = context.user_id
+        # check permissions for making cluster_template public
+        if ct_dict['public']:
+            if not policy.enforce(context, "clustertemplate:publish", None,
+                                  do_raise=False):
+                raise exception.ClusterTemplatePublishDenied()
+
+        # NOTE(yuywz): We will generate a random human-readable name for
+        # cluster_template if the name is not specified by user.
+        arg_name = ct_dict.get('name')
+        name = arg_name or self._generate_name_for_cluster_template(context)
+        ct_dict['name'] = name
+
+        new_cluster_template = objects.ClusterTemplate(context,
+                                                       **ct_dict)
         new_cluster_template.create()
         # Set the HTTP Location Header
         pecan.response.location = link.build_url('clustertemplates',
