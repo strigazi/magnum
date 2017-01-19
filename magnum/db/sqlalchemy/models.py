@@ -158,8 +158,7 @@ class ClusterTemplate(Base):
     name = Column(String(255))
     public = Column(Boolean, default=False)
     cluster_attributes_id = Column(String(length=36),
-                                   ForeignKey('cluster_attributes.id'),
-                                   nullable=False)
+                                   ForeignKey('cluster_attributes.id'))
 
 
 class ClusterAttributes(Base):

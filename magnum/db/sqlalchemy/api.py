@@ -634,3 +634,58 @@ class Connection(api.Connection):
             msg = (_('project_id %(project_id)s resource %(resource)s.') %
                    {'project_id': project_id, 'resource': resource})
             raise exception.QuotaNotFound(msg=msg)
+
+    def create_cluster_attributes(self, values):
+        if not values.get('id'):
+            values['id'] = uuidutils.generate_uuid()
+
+        cluster_attributes = models.ClusterAttributes()
+        cluster_attributes.update(values)
+        try:
+            cluster_attributes.save()
+        except db_exc.DBDuplicateEntry:
+            raise exception.ClusterAttributesAlreadyExist(id=values['id'])
+        return cluster_attributes
+
+    def get_cluster_attributes_by_id(self, context, cluster_attributes_id):
+        query = model_query(models.ClusterAttributes)
+        query = query.filter_by(id=cluster_attributes_id)
+        try:
+            return query.one()
+        except NoResultFound:
+            raise exception.ClusterAttributesNotFound(
+                cluster_attributes=cluster_attributes_id)
+
+    def destroy_cluster_attributes(self, cluster_attributes_id):
+        session = get_session()
+        with session.begin():
+            query = model_query(models.ClusterAttributes, session=session)
+            query = add_identity_filter(query, cluster_attributes_id)
+
+            try:
+                query.delete()
+            except NoResultFound:
+                raise exception.ClusterAttributesNotFound(
+                    clustertemplate=cluster_attributes_id)
+
+    def update_cluster_attributes(self, cluster_attributes_id, values):
+        if 'uuid' in values:
+            msg = _("Cannot overwrite UUID for an existing ClusterAttributes.")
+            raise exception.InvalidParameterValue(err=msg)
+
+        return self._do_update_cluster_attributes(cluster_attributes_id,
+                                                  values)
+
+    def _do_update_cluster_attributes(self, cluster_attributes_id, values):
+        session = get_session()
+        with session.begin():
+            query = model_query(models.ClusterAttributes, session=session)
+            query = add_identity_filter(query, cluster_attributes_id)
+            try:
+                ref = query.with_lockmode('update').one()
+            except NoResultFound:
+                raise exception.ClusterAttributesNotFound(
+                    cluster_attributes=cluster_attributes_id)
+
+            ref.update(values)
+        return ref

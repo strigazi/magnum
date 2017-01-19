@@ -17,7 +17,7 @@ from oslo_versionedobjects import fields
 from magnum.common import exception
 from magnum.db import api as dbapi
 from magnum.objects import base
-from magnum.objects.cluster_template import ClusterTemplate
+from magnum.objects.cluster_attributes import ClusterAttributes
 from magnum.objects import fields as m_fields
 
 
@@ -42,8 +42,10 @@ class Cluster(base.MagnumPersistentObject, base.MagnumObject,
     # Version 1.11: Added 'RESUME_FAILED' in status field
     # Version 1.12: Added 'get_stats' method
     # Version 1.13: Added get_count_all method
+    # Version 1.14: Move data master_count, node_count, keypair, discovery_url
+    #               and craete_timeout to cluster_attributes
 
-    VERSION = '1.13'
+    VERSION = '1.14'
 
     dbapi = dbapi.get_instance()
 
@@ -54,26 +56,22 @@ class Cluster(base.MagnumPersistentObject, base.MagnumObject,
         'project_id': fields.StringField(nullable=True),
         'user_id': fields.StringField(nullable=True),
         'cluster_template_id': fields.StringField(nullable=True),
-        'keypair': fields.StringField(nullable=True),
         'stack_id': fields.StringField(nullable=True),
         'status': m_fields.ClusterStatusField(nullable=True),
         'status_reason': fields.StringField(nullable=True),
-        'create_timeout': fields.IntegerField(nullable=True),
         'api_address': fields.StringField(nullable=True),
         'node_addresses': fields.ListOfStringsField(nullable=True),
-        'node_count': fields.IntegerField(nullable=True),
-        'master_count': fields.IntegerField(nullable=True),
-        'discovery_url': fields.StringField(nullable=True),
         'master_addresses': fields.ListOfStringsField(nullable=True),
         'ca_cert_ref': fields.StringField(nullable=True),
         'magnum_cert_ref': fields.StringField(nullable=True),
-        'cluster_template': fields.ObjectField('ClusterTemplate'),
         'trust_id': fields.StringField(nullable=True),
         'trustee_username': fields.StringField(nullable=True),
         'trustee_password': fields.StringField(nullable=True),
         'trustee_user_id': fields.StringField(nullable=True),
         'coe_version': fields.StringField(nullable=True),
-        'container_version': fields.StringField(nullable=True)
+        'container_version': fields.StringField(nullable=True),
+        'cluster_attributes_id': fields.StringField(nullable=True),
+        'cluster_attributes': fields.ObjectField('ClusterAttributes'),
     }
 
     @staticmethod
@@ -83,12 +81,8 @@ class Cluster(base.MagnumPersistentObject, base.MagnumObject,
             if field != 'cluster_template':
                 cluster[field] = db_cluster[field]
 
-        # Note(eliqiao): The following line needs to be placed outside the
-        # loop because there is a dependency from cluster_template to
-        # cluster_template_id. The cluster_template_id must be populated
-        # first in the loop before it can be used to find the cluster_template.
-        cluster['cluster_template'] = ClusterTemplate.get_by_uuid(
-            cluster._context, cluster.cluster_template_id)
+        cluster['cluster_attributes'] = ClusterAttributes.get_by_id(
+            cluster._context, cluster.cluster_attributes_id)
 
         cluster.obj_reset_changes()
         return cluster
