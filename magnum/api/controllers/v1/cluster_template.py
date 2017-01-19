@@ -13,6 +13,7 @@
 #    under the License.
 
 from oslo_utils import timeutils
+from oslo_utils import uuidutils
 import pecan
 import wsme
 from wsme import types as wtypes
@@ -50,24 +51,24 @@ class ClusterTemplate(base.APIBase):
     coe = wtypes.Enum(str, *fields.ClusterType.ALL, mandatory=True)
     """The Container Orchestration Engine for this clustertemplate"""
 
-    image_id = wsme.wsattr(wtypes.StringType(min_length=1, max_length=255),
-                           mandatory=True)
+    image = wsme.wsattr(wtypes.StringType(min_length=1, max_length=255),
+                        mandatory=True)
     """The image name or UUID to use as an image for this ClusterTemplate"""
 
-    flavor_id = wtypes.StringType(min_length=1, max_length=255)
+    flavor = wtypes.StringType(min_length=1, max_length=255)
     """The flavor of this ClusterTemplate"""
 
-    master_flavor_id = wtypes.StringType(min_length=1, max_length=255)
+    master_flavor = wtypes.StringType(min_length=1, max_length=255)
     """The flavor of the master node for this ClusterTemplate"""
 
     dns_nameserver = wtypes.IPv4AddressType()
     """The DNS nameserver address"""
 
-    keypair_id = wsme.wsattr(wtypes.StringType(min_length=1, max_length=255),
-                             default=None)
+    keypair = wsme.wsattr(wtypes.StringType(min_length=1, max_length=255),
+                          default=None)
     """The name or id of the nova ssh keypair"""
 
-    external_network_id = wtypes.StringType(min_length=1, max_length=255)
+    external_network = wtypes.StringType(min_length=1, max_length=255)
     """The external network to attach to the Cluster"""
 
     fixed_network = wtypes.StringType(min_length=1, max_length=255)
@@ -141,7 +142,12 @@ class ClusterTemplate(base.APIBase):
 
     def __init__(self, **kwargs):
         self.fields = []
-        for field in objects.ClusterTemplate.fields:
+
+        supported_fields = list()
+        supported_fields += objects.ClusterTemplate.fields.keys()
+        supported_fields += objects.ClusterAttributes.fields.keys()
+
+        for field in supported_fields:
             # Skip fields we do not expose.
             if not hasattr(self, field):
                 continue
@@ -161,7 +167,12 @@ class ClusterTemplate(base.APIBase):
 
     @classmethod
     def convert_with_links(cls, rpc_cluster_template):
-        cluster_template = ClusterTemplate(**rpc_cluster_template.as_dict())
+        rpc_ct_dict = rpc_cluster_template.as_dict()
+        api_ct_dict = rpc_cluster_template.cluster_attributes.as_dict()
+        for (key, value) in rpc_ct_dict.items():
+            api_ct_dict[key] = value
+
+        cluster_template = ClusterTemplate(**api_ct_dict)
         return cls._convert_with_links(cluster_template,
                                        pecan.request.host_url)
 
@@ -170,12 +181,12 @@ class ClusterTemplate(base.APIBase):
         sample = cls(
             uuid='27e3153e-d5bf-4b7e-b517-fb518e17f34c',
             name='example',
-            image_id='Fedora-k8s',
-            flavor_id='m1.small',
-            master_flavor_id='m1.small',
+            image='Fedora-k8s',
+            flavor='m1.small',
+            master_flavor='m1.small',
             dns_nameserver='8.8.1.1',
-            keypair_id='keypair1',
-            external_network_id='ffc44e4a-2319-4062-bce0-9ae1c38b05ba',
+            keypair='keypair1',
+            external_network='ffc44e4a-2319-4062-bce0-9ae1c38b05ba',
             fixed_network='private',
             fixed_subnet='private-subnet',
             network_driver='libnetwork',
@@ -201,7 +212,7 @@ class ClusterTemplate(base.APIBase):
 
 class ClusterTemplatePatchType(types.JsonPatchType):
     _api_base = ClusterTemplate
-    _extra_non_removable_attrs = {'/network_driver', '/external_network_id',
+    _extra_non_removable_attrs = {'/network_driver', '/external_network',
                                   '/tls_disabled', '/public', '/server_type',
                                   '/coe', '/registry_enabled',
                                   '/cluster_distro'}
@@ -328,7 +339,6 @@ class ClusterTemplatesController(base.Controller):
     @expose.expose(ClusterTemplate, body=ClusterTemplate, status_code=201)
     @validation.enforce_server_type()
     @validation.enforce_network_driver_types_create()
-    @validation.enforce_volume_driver_types_create()
     @validation.enforce_volume_storage_size_create()
     def post(self, cluster_template):
         """Create a new ClusterTemplate.
@@ -343,7 +353,7 @@ class ClusterTemplatesController(base.Controller):
         attr_validator.validate_os_resources(context, cluster_template_dict)
         image_data = attr_validator.validate_image(cli,
                                                    cluster_template_dict[
-                                                       'image_id'])
+                                                       'image'])
         cluster_template_dict['cluster_distro'] = image_data['os_distro']
         cluster_template_dict['project_id'] = context.project_id
         cluster_template_dict['user_id'] = context.user_id
@@ -359,8 +369,24 @@ class ClusterTemplatesController(base.Controller):
         name = arg_name or self._generate_name_for_cluster_template(context)
         cluster_template_dict['name'] = name
 
+        # create cluster_attributes for this cluster_template
+        # cluster_attributes dict
+        cattr_dict = dict()
+        for attr in objects.ClusterAttributes.fields:
+            cattr_dict[attr] = cluster_template_dict.get(attr)
+        cattr_dict['id'] = uuidutils.generate_uuid()
+        cluster_attributes = objects.ClusterAttributes(context,
+                                                       **cattr_dict)
+        cluster_attributes.create()
+
+        new_ct_dict = dict()
+        for attr in objects.ClusterTemplate.fields:
+            new_ct_dict[attr] = cluster_template_dict.get(attr)
+        del new_ct_dict['id']
+        new_ct_dict['cluster_attributes'] = cluster_attributes
+        new_ct_dict['cluster_attributes_id'] = cluster_attributes.id
         new_cluster_template = objects.ClusterTemplate(context,
-                                                       **cluster_template_dict)
+                                                       **new_ct_dict)
         new_cluster_template.create()
         # Set the HTTP Location Header
         pecan.response.location = link.build_url('clustertemplates',
