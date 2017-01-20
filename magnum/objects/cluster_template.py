@@ -17,6 +17,7 @@ from oslo_versionedobjects import fields
 from magnum.common import exception
 from magnum.db import api as dbapi
 from magnum.objects import base
+from magnum.objects import fields as m_fields
 from magnum.objects.cluster_attributes import ClusterAttributes
 
 
@@ -51,10 +52,30 @@ class ClusterTemplate(base.MagnumPersistentObject, base.MagnumObject,
         'project_id': fields.StringField(nullable=True),
         'user_id': fields.StringField(nullable=True),
         'name': fields.StringField(nullable=True),
+        'image': fields.StringField(nullable=True),
+        'flavor': fields.StringField(nullable=True),
+        'master_flavor': fields.StringField(nullable=True),
+        'keypair': fields.StringField(nullable=True),
+        'dns_nameserver': fields.StringField(nullable=True),
+        'external_network': fields.StringField(nullable=True),
+        'fixed_network': fields.StringField(nullable=True),
+        'fixed_subnet': fields.StringField(nullable=True),
+        'network_driver': fields.StringField(nullable=True),
+        'volume_driver': fields.StringField(nullable=True),
+        'apiserver_port': fields.IntegerField(nullable=True),
+        'docker_volume_size': fields.IntegerField(nullable=True),
+        'docker_storage_driver': m_fields.DockerStorageDriverField(
+            nullable=True),
+        'cluster_distro': fields.StringField(nullable=True),
+        'coe': m_fields.ClusterTypeField(nullable=True),
+        'http_proxy': fields.StringField(nullable=True),
+        'https_proxy': fields.StringField(nullable=True),
+        'no_proxy': fields.StringField(nullable=True),
+        'registry_enabled': fields.BooleanField(default=False),
+        'labels': fields.DictOfStringsField(nullable=True),
+        'tls_disabled': fields.BooleanField(default=False),
         'public': fields.BooleanField(default=False),
         'cluster_attributes_id': fields.StringField(nullable=True),
-        'cluster_attributes': fields.ObjectField('ClusterAttributes',
-                                                 nullable=True),
     }
 
     @staticmethod
