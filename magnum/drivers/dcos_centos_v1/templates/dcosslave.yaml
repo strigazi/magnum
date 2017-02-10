@@ -1,4 +1,4 @@
-heat_template_version: 2016-10-14
+heat_template_version: 2016-04-08
 
 description: >
   This is a nested stack that defines a single DC/OS slave, This stack is
@@ -197,20 +197,12 @@ resources:
 
   slave_wait_condition:
     type: OS::Heat::WaitCondition
-    depends_on: dcos_slave
+    depends_on: dcos-slave
     properties:
       handle: {get_resource: slave_wait_handle}
       timeout: {get_param: wait_condition_timeout}
 
-  secgroup_all_open:
-    type: OS::Neutron::SecurityGroup
-    properties:
-      rules:
-        - protocol: icmp
-        - protocol: tcp
-        - protocol: udp
-
-  ######################################################################
+  #####################################################################
   #
   # software configs.  these are components that are combined into
   # a multipart MIME user-data archive.
@@ -298,7 +290,7 @@ resources:
   # a single DC/OS slave.
   #
 
-  dcos_slave:
+  dcos-slave:
     type: OS::Nova::Server
     properties:
       image: {get_param: server_image}
@@ -306,33 +298,17 @@ resources:
       key_name: {get_param: ssh_key_name}
       user_data_format: RAW
       user_data: {get_resource: dcos_slave_init}
-      networks:
-        - port: {get_resource: dcos_slave_eth0}
-
-  dcos_slave_eth0:
-    type: OS::Neutron::Port
-    properties:
-      network: {get_param: fixed_network}
-      security_groups:
-        - get_resource: secgroup_all_open
-        - get_param: secgroup_base_id
-      fixed_ips:
-        - subnet: {get_param: fixed_subnet}
-
-  dcos_slave_floating:
-    type: Magnum::Optional::DcosSlave::Neutron::FloatingIP
-    properties:
-      floating_network: {get_param: external_network}
-      port_id: {get_resource: dcos_slave_eth0}
+      metadata:
+        cern-services: false              
 
 outputs:
 
   dcos_slave_ip:
-    value: {get_attr: [dcos_slave_eth0, fixed_ips, 0, ip_address]}
+    value: {get_attr: [dcos-slave, first_address]}
     description: >
       This is the "private" address of the DC/OS slave node.
 
   dcos_slave_external_ip:
-    value: {get_attr: [dcos_slave_floating, floating_ip_address]}
+    value: {get_attr: [dcos-slave, first_address]}
     description: >
       This is the "public" address of the DC/OS slave node.

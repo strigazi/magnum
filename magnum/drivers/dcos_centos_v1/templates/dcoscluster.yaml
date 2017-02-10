@@ -1,4 +1,4 @@
-heat_template_version: 2016-10-14
+heat_template_version: 2016-04-08
 
 description: >
   This template will boot a DC/OS cluster with one or more masters
@@ -334,49 +334,6 @@ resources:
 
   ######################################################################
   #
-  # network resources.  allocate a network and router for our server.
-  #
-
-  network:
-    type: ../../common/templates/network.yaml
-    properties:
-      existing_network: {get_param: fixed_network}
-      existing_subnet: {get_param: fixed_subnet}
-      private_network_cidr: {get_param: fixed_network_cidr}
-      dns_nameserver: {get_param: dns_nameserver}
-      external_network: {get_param: external_network}
-
-  api_lb:
-    type: lb.yaml
-    properties:
-      fixed_subnet: {get_attr: [network, fixed_subnet]}
-      external_network: {get_param: external_network}
-
-  ######################################################################
-  #
-  # security groups.  we need to permit network traffic of various
-  # sorts.
-  #
-
-  secgroup:
-    type: secgroup.yaml
-
-  ######################################################################
-  #
-  # resources that expose the IPs of either the dcos master or a given
-  # LBaaS pool depending on whether LBaaS is enabled for the cluster.
-  #
-
-  api_address_lb_switch:
-    type: Magnum::ApiGatewaySwitcher
-    properties:
-      pool_public_ip: {get_attr: [api_lb, floating_address]}
-      pool_private_ip: {get_attr: [api_lb, address]}
-      master_public_ip: {get_attr: [dcos_masters, resource.0.dcos_master_external_ip]}
-      master_private_ip: {get_attr: [dcos_masters, resource.0.dcos_master_ip]}
-
-  ######################################################################
-  #
   # Master SoftwareConfig.
   #
 
@@ -520,7 +477,7 @@ resources:
         EXHIBITOR_AZURE_PREFIX: {get_param: exhibitor_azure_prefix}
         MASTER_DISCOVERY: {get_param: master_discovery}
         MASTER_LIST: {list_join: [' ', {get_attr: [dcos_masters, dcos_master_ip]}]}
-        EXHIBITOR_ADDRESS: {get_attr: [api_lb, address]}
+        EXHIBITOR_ADDRESS: {get_attr: [dcos_masters, dcos_master_ip]}
         NUM_MASTERS: {get_param: number_of_masters}
         DCOS_OVERLAY_ENABLE: {get_param: dcos_overlay_enable}
         DCOS_OVERLAY_CONFIG_ATTEMPTS: {get_param: dcos_overlay_config_attempts}
@@ -553,8 +510,6 @@ resources:
 
   dcos_masters:
     type: OS::Heat::ResourceGroup
-    depends_on:
-      - network
     properties:
       count: {get_param: number_of_masters}
       resource_def:
@@ -564,16 +519,16 @@ resources:
           server_image: {get_param: server_image}
           master_flavor: {get_param: master_flavor}
           external_network: {get_param: external_network}
-          fixed_network: {get_attr: [network, fixed_network]}
-          fixed_subnet: {get_attr: [network, fixed_subnet]}
-          secgroup_base_id: {get_attr: [secgroup, secgroup_base_id]}
-          secgroup_dcos_id: {get_attr: [secgroup, secgroup_dcos_id]}
-          api_pool_80_id: {get_attr: [api_lb, pool_80_id]}
-          api_pool_443_id: {get_attr: [api_lb, pool_443_id]}
-          api_pool_8080_id: {get_attr: [api_lb, pool_8080_id]}
-          api_pool_5050_id: {get_attr: [api_lb, pool_5050_id]}
-          api_pool_2181_id: {get_attr: [api_lb, pool_2181_id]}
-          api_pool_8181_id: {get_attr: [api_lb, pool_8181_id]}
+          fixed_network: ""
+          fixed_subnet: ""
+          secgroup_base_id: ""
+          secgroup_dcos_id: ""
+          api_pool_80_id: ""
+          api_pool_443_id: ""
+          api_pool_8080_id: "" 
+          api_pool_5050_id: "" 
+          api_pool_2181_id: "" 
+          api_pool_8181_id: "" 
 
   ######################################################################
   #
@@ -585,7 +540,7 @@ resources:
   dcos_slaves:
     type: OS::Heat::ResourceGroup
     depends_on:
-      - network
+      - dcos_masters
     properties:
       count: {get_param: number_of_slaves}
       removal_policies: [{resource_list: {get_param: slaves_to_remove}}]
@@ -595,11 +550,11 @@ resources:
           ssh_key_name: {get_param: ssh_key_name}
           server_image: {get_param: server_image}
           slave_flavor: {get_param: slave_flavor}
-          fixed_network: {get_attr: [network, fixed_network]}
-          fixed_subnet: {get_attr: [network, fixed_subnet]}
+          fixed_network: ""
+          fixed_subnet: ""
           external_network: {get_param: external_network}
           wait_condition_timeout: {get_param: wait_condition_timeout}
-          secgroup_base_id: {get_attr: [secgroup, secgroup_base_id]}
+          secgroup_base_id: ""
           # DC/OS params
           auth_url: {get_param: auth_url}
           username: {get_param: username}
@@ -627,7 +582,7 @@ resources:
           exhibitor_azure_prefix: {get_param: exhibitor_azure_prefix}
           master_discovery: {get_param: master_discovery}
           master_list: {list_join: [' ', {get_attr: [dcos_masters, dcos_master_ip]}]}
-          exhibitor_address: {get_attr: [api_lb, address]}
+          exhibitor_address: {get_attr: [dcos_masters, resource.0.dcos_master_external_ip]}
           num_masters: {get_param: number_of_masters}
           dcos_overlay_enable: {get_param: dcos_overlay_enable}
           dcos_overlay_config_attempts: {get_param: dcos_overlay_config_attempts}
@@ -646,7 +601,7 @@ resources:
 outputs:
 
   api_address:
-    value: {get_attr: [api_address_lb_switch, public_ip]}
+    value: {get_attr: [dcos_masters, resource.0.dcos_master_external_ip]}
     description: >
       This is the API endpoint of the DC/OS master. Use this to access
       the DC/OS API from outside the cluster.
