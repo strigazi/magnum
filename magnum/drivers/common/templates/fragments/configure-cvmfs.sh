@@ -22,7 +22,3 @@ docker cp docker-volume-cvmfs:/usr/sbin/docker-volume-cvmfs /var/lib/kubelet/plu
 
 # TODO: drop this requirement (kubelet seems to need the binary there on start)
 systemctl restart kubelet
-
-# TODO: move this elsewhere
-lvextend /dev/atomicos/root --size 5G
-xfs_growfs /dev/mapper/atomicos-root

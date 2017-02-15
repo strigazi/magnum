@@ -32,8 +32,6 @@ if [ -n "$DOCKER_VOLUME_SIZE" ] && [ "$DOCKER_VOLUME_SIZE" -gt 0 ]; then
   fi
 fi
 
-systemctl stop docker
-
 $configure_docker_storage_driver
 
 if [ "$DOCKER_STORAGE_DRIVER" = "overlay" ]; then
@@ -48,5 +46,3 @@ if [ "$DOCKER_STORAGE_DRIVER" = "overlay" ]; then
 else
     configure_devicemapper
 fi
-
-systemctl start docker-storage-setup
