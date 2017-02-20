@@ -66,6 +66,9 @@ write_files:
 
       cert_dir=/etc/kubernetes/ssl
       cert_conf_dir=${cert_dir}/conf
+      KUBE_SERVICE_IP=$(echo $PORTAL_NETWORK_CIDR | awk 'BEGIN{FS="[./]"; OFS="."}{print $1,$2,$3,$4 + 1}')
+
+      sans="${sans},IP:${KUBE_SERVICE_IP}"
 
       mkdir -p "$cert_dir"
       mkdir -p "$cert_conf_dir"
