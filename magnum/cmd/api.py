@@ -74,5 +74,19 @@ def main():
     LOG.info(_LI('Serving on %(proto)s://%(host)s:%(port)s'),
              dict(proto="https" if use_ssl else "http", host=host, port=port))
 
+    # Workaround to log the actual client IP when using a reverse proxy.
+    # This is only used when the corresponding header is present.
+    # werkzeug doesn't seem to do it even when using ProxyFix, so we're
+    # left with this hack.
+    _handler_clazz = serving.WSGIRequestHandler
+    _handler_clazz.address_string = \
+        type(_handler_clazz.address_string)(
+                lambda self: ('%s,%s' % (
+                    self.headers.dict['x-forwarded-for'],
+                    self.client_address[0])
+                    if 'x-forwarded-for' in self.headers.dict
+                    else self.client_address[0]
+                    ), None, _handler_clazz)
+
     serving.run_simple(host, port, app,
                        ssl_context=_get_ssl_configs(use_ssl))
