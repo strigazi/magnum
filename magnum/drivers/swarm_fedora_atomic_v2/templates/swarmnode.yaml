@@ -264,29 +264,11 @@ resources:
       group: ungrouped
       config: {get_file: ../../common/templates/swarm/fragments/write-docker-socket.yaml}
 
-  network_service:
-    type: "OS::Heat::SoftwareConfig"
-    properties:
-      group: ungrouped
-      config: {get_file: ../../common/templates/swarm/fragments/network-service.sh}
-
-  write_swarm_agent_failure_service:
-    type: "OS::Heat::SoftwareConfig"
-    properties:
-      group: ungrouped
-      config:
-        str_replace:
-          template: {get_file: ../../common/templates/swarm/fragments/write-cluster-failure-service.yaml}
-          params:
-            "$SERVICE": swarm-agent
-            "$WAIT_HANDLE_ENDPOINT": {get_attr: [node_wait_handle, endpoint]}
-            "$WAIT_HANDLE_TOKEN": {get_attr: [node_wait_handle, token]}
-
   write_swarm_agent_service:
     type: "OS::Heat::SoftwareConfig"
     properties:
       group: ungrouped
-      config: {get_file: ../../common/templates/swarm/fragments/write-swarm-agent-service.sh}
+      config: {get_file: fragments/write-swarm-agent-service.sh}
 
   enable_docker_registry:
     type: OS::Heat::SoftwareConfig
@@ -302,7 +284,7 @@ resources:
         str_replace:
           template: {get_file: ../../common/templates/swarm/fragments/enable-services.sh}
           params:
-            "$NODE_SERVICES": "docker.socket docker swarm-agent"
+            "$NODE_SERVICES": "docker.socket docker"
 
   cfn_signal:
     type: "OS::Heat::SoftwareConfig"
@@ -336,16 +318,14 @@ resources:
         - config: {get_resource: remove_docker_key}
         - config: {get_resource: write_heat_params}
         - config: {get_resource: make_cert}
-        - config: {get_resource: network_service}
         - config: {get_resource: configure_docker_storage}
         - config: {get_resource: configure_docker_registry}
-        - config: {get_resource: write_swarm_agent_failure_service}
-        - config: {get_resource: write_swarm_agent_service}
         - config: {get_resource: add_docker_daemon_options}
         - config: {get_resource: write_docker_socket}
         - config: {get_resource: add_proxy}
         - config: {get_resource: enable_docker_registry}
         - config: {get_resource: enable_services}
+        - config: {get_resource: write_swarm_agent_service}
         - config: {get_resource: cfn_signal}
         - config: {get_resource: volume_service}
 

@@ -13,8 +13,8 @@
 # under the License.
 
 from magnum.drivers.heat import driver
-from magnum.drivers.swarm_fedora_atomic_v1 import monitor
-from magnum.drivers.swarm_fedora_atomic_v1 import template_def
+from magnum.drivers.swarm_fedora_atomic_v2 import monitor
+from magnum.drivers.swarm_fedora_atomic_v2 import template_def
 
 
 class Driver(driver.HeatDriver):
@@ -23,7 +23,7 @@ class Driver(driver.HeatDriver):
     def provides(self):
         return [
             {'server_type': 'vm',
-             'os': 'fedora-atomic',
+             'os': 'fedora-atomic-swarm-mode',
              'coe': 'swarm'},
         ]
 

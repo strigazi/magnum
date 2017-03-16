@@ -5,7 +5,7 @@ description: >
   of several master nodes, and N agent nodes. Every node in the cluster,
   including the master, is running a Docker daemon and a swarm agent
   advertising it to the cluster. The master is running an addition swarm
-  master container listening on port 2376. By default, the cluster is made
+  master container listening on port 2375. By default, the cluster is made
   up of one master node and one agent node.
 
 parameters:
@@ -52,12 +52,10 @@ parameters:
   #
   master_flavor:
     type: string
-    default: m1.small
     description: flavor to use when booting the swarm master
 
   node_flavor:
     type: string
-    default: m1.small
     description: flavor to use when booting the swarm node
 
   dns_nameserver:
@@ -89,6 +87,10 @@ parameters:
     type: number
     description: how many swarm nodes to spawn
     default: 1
+
+  number_of_secondary_masters:
+    type: number
+    description: how many secondary masters to spawn
 
   fixed_network_cidr:
     type: string
@@ -156,7 +158,7 @@ parameters:
     type: number
     description: >
       The port which are used by swarm manager to provide swarm service.
-    default: 2376
+    default: 2375
 
   swarm_version:
     type: string
@@ -248,6 +250,10 @@ parameters:
       other hosts are using the volume
     default: "false"
 
+  is_primary_master:
+    type: boolean
+    default: True
+
 
 resources:
 
@@ -299,8 +305,8 @@ resources:
           port_range_min: 22
           port_range_max: 22
         - protocol: tcp
-          port_range_min: 2376
-          port_range_max: 2376
+          port_range_min: 2375
+          port_range_max: 2375
         - protocol: tcp
           remote_ip_prefix: {get_param: fixed_network_cidr}
           port_range_min: 1
@@ -328,14 +334,14 @@ resources:
     properties:
       pool_public_ip: {get_attr: [api_lb, floating_address]}
       pool_private_ip: {get_attr: [api_lb, address]}
-      master_public_ip: {get_attr: [swarm_masters, resource.0.swarm_master_external_ip]}
-      master_private_ip: {get_attr: [swarm_masters, resource.0.swarm_master_ip]}
+      master_public_ip: {get_attr: [swarm_primary_master, resource.0.swarm_master_external_ip]}
+      master_private_ip: {get_attr: [swarm_primary_master, resource.0.swarm_master_ip]}
 
   etcd_address_lb_switch:
     type: Magnum::ApiGatewaySwitcher
     properties:
       pool_private_ip: {get_attr: [etcd_lb, address]}
-      master_private_ip: {get_attr: [swarm_masters, resource.0.swarm_master_ip]}
+      master_private_ip: {get_attr: [swarm_primary_master, resource.0.swarm_master_ip]}
 
   ######################################################################
   #
@@ -344,15 +350,16 @@ resources:
   # It supports high availability by create a primary manager and multiple
   # replica instances.
 
-  swarm_masters:
+  swarm_primary_master:
     type: "OS::Heat::ResourceGroup"
     depends_on:
       - network
     properties:
-      count: {get_param: number_of_masters}
+      count: 1
       resource_def:
         type: swarmmaster.yaml
         properties:
+          is_primary_master: {get_param: is_primary_master}
           ssh_key_name: {get_param: ssh_key_name}
           server_image: {get_param: server_image}
           server_flavor: {get_param: master_flavor}
@@ -425,6 +432,50 @@ resources:
           volume_driver: {get_param: volume_driver}
           rexray_preempt: {get_param: rexray_preempt}
 
+  swarm_secondary_masters:
+    type: "OS::Heat::ResourceGroup"
+    depends_on:
+      - network
+    properties:
+      count: {get_param: number_of_secondary_masters}
+      resource_def:
+        type: swarmmaster.yaml
+        properties:
+          ssh_key_name: {get_param: ssh_key_name}
+          server_image: {get_param: server_image}
+          server_flavor: {get_param: master_flavor}
+          docker_volume_size: {get_param: docker_volume_size}
+          docker_storage_driver: {get_param: docker_storage_driver}
+          fixed_network_id: {get_attr: [network, fixed_network]}
+          fixed_subnet_id: {get_attr: [network, fixed_subnet]}
+          external_network: {get_param: external_network}
+          discovery_url: {get_param: discovery_url}
+          http_proxy: {get_param: http_proxy}
+          https_proxy: {get_param: https_proxy}
+          no_proxy: {get_param: no_proxy}
+          swarm_api_ip: {get_attr: [api_address_lb_switch, private_ip]}
+          cluster_uuid: {get_param: cluster_uuid}
+          magnum_url: {get_param: magnum_url}
+          tls_disabled: {get_param: tls_disabled}
+          secgroup_swarm_master_id: {get_resource: secgroup_swarm_manager}
+          network_driver: {get_param: network_driver}
+          flannel_network_cidr: {get_param: flannel_network_cidr}
+          flannel_network_subnetlen: {get_param: flannel_network_subnetlen}
+          flannel_backend: {get_param: flannel_backend}
+          swarm_port: {get_param: swarm_port}
+          api_pool_id: {get_attr: [api_lb, pool_id]}
+          etcd_pool_id: {get_attr: [etcd_lb, pool_id]}
+          etcd_server_ip: {get_attr: [etcd_lb, address]}
+          api_ip_address: {get_attr: [api_lb, floating_address]}
+          swarm_version: {get_param: swarm_version}
+          swarm_strategy: {get_param: swarm_strategy}
+          trustee_user_id: {get_param: trustee_user_id}
+          trustee_password: {get_param: trustee_password}
+          trust_id: {get_param: trust_id}
+          auth_url: {get_param: auth_url}
+          volume_driver: {get_param: volume_driver}
+          rexray_preempt: {get_param: rexray_preempt}
+
   swarm_nodes:
     type: "OS::Heat::ResourceGroup"
     depends_on:
@@ -483,13 +534,19 @@ outputs:
       This is the API endpoint of the Swarm masters. Use this to access
       the Swarm API server from outside the cluster.
 
-  swarm_masters_private:
-    value: {get_attr: [swarm_masters, swarm_master_ip]}
+  swarm_primary_master_private:
+    value: {get_attr: [swarm_primary_master, swarm_master_ip]}
     description: >
       This is a list of the "private" addresses of all the Swarm masters.
 
-  swarm_masters:
-    value: {get_attr: [swarm_masters, swarm_master_external_ip]}
+  swarm_primary_master:
+    value: {get_attr: [swarm_primary_master, swarm_master_external_ip]}
+    description: >
+      This is a list of "public" ip addresses of all Swarm masters.
+      Use these addresses to log into the Swarm masters via ssh.
+
+  swarm_secondary_masters:
+    value: {get_attr: [swarm_secondary_masters, swarm_master_external_ip]}
     description: >
       This is a list of "public" ip addresses of all Swarm masters.
       Use these addresses to log into the Swarm masters via ssh.

@@ -168,6 +168,11 @@ parameters:
       other hosts are using the volume
     default: "false"
 
+  is_primary_master:
+    type: boolean
+    description: whether this master is primary or not
+    default: False
+
 resources:
 
   master_wait_handle:
@@ -211,8 +216,9 @@ resources:
       group: ungrouped
       config:
         str_replace:
-          template: {get_file: ../../common/templates/swarm/fragments/write-heat-params-master.yaml}
+          template: {get_file: fragments/write-heat-params-master.yaml}
           params:
+            "$IS_PRIMARY_MASTER": {get_param: is_primary_master}
             "$WAIT_HANDLE_ENDPOINT": {get_attr: [master_wait_handle, endpoint]}
             "$WAIT_HANDLE_TOKEN": {get_attr: [master_wait_handle, token]}
             "$WAIT_CURL": {get_attr: [master_wait_handle, curl_cli]}
@@ -223,6 +229,7 @@ resources:
             "$HTTP_PROXY": {get_param: http_proxy}
             "$HTTPS_PROXY": {get_param: https_proxy}
             "$NO_PROXY": {get_param: no_proxy}
+            "$PRIMARY_MASTER_IP": {get_param: swarm_api_ip}
             "$SWARM_API_IP": {get_attr: [api_address_switch, private_ip]}
             "$SWARM_NODE_IP": {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
             "$CLUSTER_UUID": {get_param: cluster_uuid}
@@ -241,30 +248,6 @@ resources:
             "$AUTH_URL": {get_param: auth_url}
             "$VOLUME_DRIVER": {get_param: volume_driver}
             "$REXRAY_PREEMPT": {get_param: rexray_preempt}
-
-  write_network_config:
-    type: "OS::Heat::SoftwareConfig"
-    properties:
-      group: ungrouped
-      config: {get_file: ../../common/templates/swarm/fragments/write-network-config.sh}
-
-  network_config_service:
-    type: "OS::Heat::SoftwareConfig"
-    properties:
-      group: ungrouped
-      config: {get_file: ../../common/templates/swarm/fragments/network-config-service.sh}
-
-  network_service:
-    type: "OS::Heat::SoftwareConfig"
-    properties:
-      group: ungrouped
-      config: {get_file: ../../common/templates/swarm/fragments/network-service.sh}
-
-  configure_etcd:
-    type: OS::Heat::SoftwareConfig
-    properties:
-      group: ungrouped
-      config: {get_file: ../../common/templates/swarm/fragments/configure-etcd.sh}
 
   remove_docker_key:
     type: "OS::Heat::SoftwareConfig"
@@ -294,18 +277,6 @@ resources:
       group: ungrouped
       config: {get_file: ../../common/templates/swarm/fragments/add-docker-daemon-options.sh}
 
-  write_swarm_manager_failure_service:
-    type: "OS::Heat::SoftwareConfig"
-    properties:
-      group: ungrouped
-      config:
-        str_replace:
-          template: {get_file: ../../common/templates/swarm/fragments/write-cluster-failure-service.yaml}
-          params:
-            "$SERVICE": swarm-manager
-            "$WAIT_HANDLE_ENDPOINT": {get_attr: [master_wait_handle, endpoint]}
-            "$WAIT_HANDLE_TOKEN": {get_attr: [master_wait_handle, token]}
-
   write_docker_socket:
     type: "OS::Heat::SoftwareConfig"
     properties:
@@ -318,9 +289,9 @@ resources:
       group: ungrouped
       config:
         str_replace:
-          template: {get_file: ../../common/templates/swarm/fragments/write-swarm-master-service.sh}
+          template: {get_file: fragments/write-swarm-master-service.sh}
           params:
-            "$ETCD_SERVER_IP": {get_attr: [etcd_address_switch, private_ip]}
+            "$SWARM_API_IP": {get_attr: [api_address_switch, private_ip]}
             "$NODE_IP": {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
             "$WAIT_HANDLE_ENDPOINT": {get_attr: [master_wait_handle, endpoint]}
             "$WAIT_HANDLE_TOKEN": {get_attr: [master_wait_handle, token]}
@@ -339,7 +310,7 @@ resources:
         str_replace:
           template: {get_file: ../../common/templates/swarm/fragments/enable-services.sh}
           params:
-            "$NODE_SERVICES": "etcd docker.socket docker swarm-manager"
+            "$NODE_SERVICES": "docker.socket docker"
 
   cfn_signal:
     type: "OS::Heat::SoftwareConfig"
@@ -373,17 +344,12 @@ resources:
         - config: {get_resource: remove_docker_key}
         - config: {get_resource: write_heat_params}
         - config: {get_resource: make_cert}
-        - config: {get_resource: configure_etcd}
-        - config: {get_resource: write_network_config}
-        - config: {get_resource: network_config_service}
-        - config: {get_resource: network_service}
         - config: {get_resource: configure_docker_storage}
-        - config: {get_resource: write_swarm_manager_failure_service}
         - config: {get_resource: add_docker_daemon_options}
         - config: {get_resource: write_docker_socket}
-        - config: {get_resource: write_swarm_master_service}
         - config: {get_resource: add_proxy}
         - config: {get_resource: enable_services}
+        - config: {get_resource: write_swarm_master_service}
         - config: {get_resource: cfn_signal}
         - config: {get_resource: volume_service}
 
