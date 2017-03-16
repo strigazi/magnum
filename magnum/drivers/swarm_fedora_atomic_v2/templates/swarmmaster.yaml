@@ -32,10 +32,6 @@ parameters:
     type: string
     description: uuid/name of a network to use for floating ip addresses
 
-  discovery_url:
-    type: string
-    description: url provided for node discovery
-
   cluster_uuid:
     type: string
     description: identifier for the cluster this template is generating
@@ -86,25 +82,6 @@ parameters:
     type: boolean
     description: whether or not to enable TLS
 
-  network_driver:
-    type: string
-    description: network driver to use for instantiating container networks
-
-  flannel_network_cidr:
-    type: string
-    description: network range for flannel overlay network
-
-  flannel_network_subnetlen:
-    type: number
-    description: size of subnet assigned to each master
-
-  flannel_backend:
-    type: string
-    description: >
-      specify the backend for flannel, default udp backend
-    constraints:
-      - allowed_values: ["udp", "vxlan", "host-gw"]
-
   swarm_version:
     type: string
     description: version of swarm used for swarm cluster
@@ -128,15 +105,6 @@ parameters:
   api_pool_id:
     type: string
     description: ID of the load balancer pool of swarm master server.
-
-  etcd_pool_id:
-    type: string
-    description: ID of the load balancer pool of etcd server.
-
-  etcd_server_ip:
-    type: string
-    description: ip address of the load balancer pool of etcd server.
-    default: ""
 
   trustee_user_id:
     type: string
@@ -199,12 +167,6 @@ resources:
       master_public_ip: {get_attr: [swarm_master_floating, floating_ip_address]}
       master_private_ip: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
 
-  etcd_address_switch:
-    type: Magnum::ApiGatewaySwitcher
-    properties:
-      pool_private_ip: {get_param: etcd_server_ip}
-      master_private_ip: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
-
   ######################################################################
   #
   # software configs.  these are components that are combined into
@@ -225,7 +187,6 @@ resources:
             "$DOCKER_VOLUME": {get_resource: docker_volume}
             "$DOCKER_VOLUME_SIZE": {get_param: docker_volume_size}
             "$DOCKER_STORAGE_DRIVER": {get_param: docker_storage_driver}
-            "$ETCD_DISCOVERY_URL": {get_param: discovery_url}
             "$HTTP_PROXY": {get_param: http_proxy}
             "$HTTPS_PROXY": {get_param: https_proxy}
             "$NO_PROXY": {get_param: no_proxy}
@@ -235,11 +196,6 @@ resources:
             "$CLUSTER_UUID": {get_param: cluster_uuid}
             "$MAGNUM_URL": {get_param: magnum_url}
             "$TLS_DISABLED": {get_param: tls_disabled}
-            "$NETWORK_DRIVER": {get_param: network_driver}
-            "$FLANNEL_NETWORK_CIDR": {get_param: flannel_network_cidr}
-            "$FLANNEL_NETWORK_SUBNETLEN": {get_param: flannel_network_subnetlen}
-            "$FLANNEL_BACKEND": {get_param: flannel_backend}
-            "$ETCD_SERVER_IP": {get_attr: [etcd_address_switch, private_ip]}
             "$API_IP_ADDRESS": {get_attr: [api_address_switch, public_ip]}
             "$SWARM_VERSION": {get_param: swarm_version}
             "$TRUSTEE_USER_ID": {get_param: trustee_user_id}
@@ -387,8 +343,6 @@ resources:
       fixed_ips:
         - subnet_id:
             get_param: fixed_subnet_id
-      allowed_address_pairs:
-        - ip_address: {get_param: flannel_network_cidr}
 
   swarm_master_floating:
     type: "OS::Neutron::FloatingIP"
@@ -405,14 +359,6 @@ resources:
       address: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
       subnet: { get_param: fixed_subnet_id }
       protocol_port: {get_param: swarm_port}
-
-  etcd_pool_member:
-    type: Magnum::Optional::Neutron::LBaaS::PoolMember
-    properties:
-      pool: {get_param: etcd_pool_id}
-      address: {get_attr: [swarm_master_eth0, fixed_ips, 0, ip_address]}
-      subnet: { get_param: fixed_subnet_id }
-      protocol_port: 2379
 
   ######################################################################
   #

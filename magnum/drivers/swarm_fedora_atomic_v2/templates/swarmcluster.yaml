@@ -31,10 +31,6 @@ parameters:
     description: uuid/name of an existing subnet to use to provision machines
     default: ""
 
-  discovery_url:
-    type: string
-    description: url provided for node discovery
-
   cluster_uuid:
     type: string
     description: identifier for the cluster this template is generating
@@ -101,29 +97,6 @@ parameters:
     type: boolean
     description: whether or not to enable TLS
     default: False
-
-  network_driver:
-    type: string
-    description: network driver to use for instantiating container networks
-    default: None
-
-  flannel_network_cidr:
-    type: string
-    description: network range for flannel overlay network
-    default: 10.100.0.0/16
-
-  flannel_network_subnetlen:
-    type: number
-    description: size of subnet assigned to each master
-    default: 24
-
-  flannel_backend:
-    type: string
-    description: >
-      specify the backend for flannel, default udp backend
-    default: "udp"
-    constraints:
-      - allowed_values: ["udp", "vxlan", "host-gw"]
 
   docker_volume_size:
     type: number
@@ -202,40 +175,6 @@ parameters:
     type: string
     description: url for keystone
 
-  registry_enabled:
-    type: boolean
-    description: >
-      Indicates whether the docker registry is enabled.
-    default: false
-
-  registry_port:
-    type: number
-    description: port of registry service
-    default: 5000
-
-  swift_region:
-    type: string
-    description: region of swift service
-    default: ""
-
-  registry_container:
-    type: string
-    description: >
-      name of swift container which docker registry stores images in
-    default: "container"
-
-  registry_insecure:
-    type: boolean
-    description: >
-      indicates whether to skip TLS verification between registry and backend storage
-    default: true
-
-  registry_chunksize:
-    type: number
-    description: >
-      size fo the data segments for the swift dynamic large objects
-    default: 5242880
-
   volume_driver:
     type: string
     description: volume driver to use for container storage
@@ -281,14 +220,6 @@ resources:
       external_network: {get_param: external_network}
       protocol: {get_param: loadbalancing_protocol}
       port: {get_param: swarm_port}
-
-  etcd_lb:
-    type: ../../common/templates/lb.yaml
-    properties:
-      fixed_subnet: {get_attr: [network, fixed_subnet]}
-      external_network: {get_param: external_network}
-      protocol: HTTP
-      port: 2379
 
   ######################################################################
   #
@@ -337,12 +268,6 @@ resources:
       master_public_ip: {get_attr: [swarm_primary_master, resource.0.swarm_master_external_ip]}
       master_private_ip: {get_attr: [swarm_primary_master, resource.0.swarm_master_ip]}
 
-  etcd_address_lb_switch:
-    type: Magnum::ApiGatewaySwitcher
-    properties:
-      pool_private_ip: {get_attr: [etcd_lb, address]}
-      master_private_ip: {get_attr: [swarm_primary_master, resource.0.swarm_master_ip]}
-
   ######################################################################
   #
   # Swarm manager is responsible for the entire cluster and manages the
@@ -369,7 +294,6 @@ resources:
           fixed_network_id: {get_attr: [network, fixed_network]}
           fixed_subnet_id: {get_attr: [network, fixed_subnet]}
           external_network: {get_param: external_network}
-          discovery_url: {get_param: discovery_url}
           http_proxy: {get_param: http_proxy}
           https_proxy: {get_param: https_proxy}
           no_proxy: {get_param: no_proxy}
@@ -378,10 +302,6 @@ resources:
           magnum_url: {get_param: magnum_url}
           tls_disabled: {get_param: tls_disabled}
           secgroup_swarm_master_id: {get_resource: secgroup_swarm_manager}
-          network_driver: {get_param: network_driver}
-          flannel_network_cidr: {get_param: flannel_network_cidr}
-          flannel_network_subnetlen: {get_param: flannel_network_subnetlen}
-          flannel_backend: {get_param: flannel_backend}
           swarm_port: {get_param: swarm_port}
           api_pool_id: {get_attr: [api_lb, pool_id]}
           api_ip_address: {get_attr: [api_lb, floating_address]}
@@ -449,7 +369,6 @@ resources:
           fixed_network_id: {get_attr: [network, fixed_network]}
           fixed_subnet_id: {get_attr: [network, fixed_subnet]}
           external_network: {get_param: external_network}
-          discovery_url: {get_param: discovery_url}
           http_proxy: {get_param: http_proxy}
           https_proxy: {get_param: https_proxy}
           no_proxy: {get_param: no_proxy}
@@ -458,14 +377,8 @@ resources:
           magnum_url: {get_param: magnum_url}
           tls_disabled: {get_param: tls_disabled}
           secgroup_swarm_master_id: {get_resource: secgroup_swarm_manager}
-          network_driver: {get_param: network_driver}
-          flannel_network_cidr: {get_param: flannel_network_cidr}
-          flannel_network_subnetlen: {get_param: flannel_network_subnetlen}
-          flannel_backend: {get_param: flannel_backend}
           swarm_port: {get_param: swarm_port}
           api_pool_id: {get_attr: [api_lb, pool_id]}
-          etcd_pool_id: {get_attr: [etcd_lb, pool_id]}
-          etcd_server_ip: {get_attr: [etcd_lb, address]}
           api_ip_address: {get_attr: [api_lb, floating_address]}
           swarm_version: {get_param: swarm_version}
           swarm_strategy: {get_param: swarm_strategy}
@@ -502,9 +415,6 @@ resources:
           magnum_url: {get_param: magnum_url}
           tls_disabled: {get_param: tls_disabled}
           secgroup_swarm_node_id: {get_resource: secgroup_swarm_node}
-          flannel_network_cidr: {get_param: flannel_network_cidr}
-          network_driver: {get_param: network_driver}
-          etcd_server_ip: {get_attr: [etcd_address_lb_switch, private_ip]}
           api_ip_address: {get_attr: [api_address_lb_switch, public_ip]}
           swarm_version: {get_param: swarm_version}
           trustee_domain_id: {get_param: trustee_domain_id}
@@ -513,12 +423,6 @@ resources:
           trustee_password: {get_param: trustee_password}
           trust_id: {get_param: trust_id}
           auth_url: {get_param: auth_url}
-          registry_enabled: {get_param: registry_enabled}
-          registry_port: {get_param: registry_port}
-          swift_region: {get_param: swift_region}
-          registry_container: {get_param: registry_container}
-          registry_insecure: {get_param: registry_insecure}
-          registry_chunksize: {get_param: registry_chunksize}
           volume_driver: {get_param: volume_driver}
           rexray_preempt: {get_param: rexray_preempt}
 
@@ -561,8 +465,3 @@ outputs:
     description: >
       This is a list of the "public" addresses of all the Swarm nodes. Use
       these addresses to, e.g., log into the nodes.
-
-  discovery_url:
-    value: {get_param: discovery_url}
-    description: >
-      This the discovery url for Swarm cluster.
