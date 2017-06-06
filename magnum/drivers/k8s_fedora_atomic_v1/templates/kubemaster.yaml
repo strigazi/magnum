@@ -237,6 +237,13 @@ parameters:
     description: >
       domain name for cluster DNS
 
+  # In case you want to host the kubernetes containers or the core dns
+  # containers. You might not want to use google_containers/kubelet but
+  # my_organization/kubelet.
+  system_container_image_prefix:
+    type: string
+    description: The prefix of the core container images components.
+
 resources:
 
   master_wait_handle:
@@ -319,6 +326,7 @@ resources:
             "$ETCD_LB_VIP": {get_param: etcd_lb_vip}
             "$DNS_SERVICE_IP": {get_param: dns_service_ip}
             "$DNS_CLUSTER_DOMAIN": {get_param: dns_cluster_domain}
+            "$SYSTEM_CONTAINER_IMAGE_PREFIX": {get_param: system_container_image_prefix}
 
   make_cert:
     type: OS::Heat::SoftwareConfig

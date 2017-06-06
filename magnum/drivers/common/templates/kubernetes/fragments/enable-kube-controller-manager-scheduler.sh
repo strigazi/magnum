@@ -2,11 +2,7 @@
 
 . /etc/sysconfig/heat-params
 
-if [ -n "${INSECURE_REGISTRY_URL}" ]; then
-    HYPERKUBE_IMAGE="${INSECURE_REGISTRY_URL}/google_containers/hyperkube:${KUBE_VERSION}"
-else
-    HYPERKUBE_IMAGE="gcr.io/google_containers/hyperkube:${KUBE_VERSION}"
-fi
+HYPERKUBE_IMAGE="{$SYSTEM_CONTAINER_IMAGE_PREFIX:gcr.io/google_containers""/hyperkube:${KUBE_VERSION}"
 
 # vars also used by the Kubernetes config files
 unset KUBE_API_PORT

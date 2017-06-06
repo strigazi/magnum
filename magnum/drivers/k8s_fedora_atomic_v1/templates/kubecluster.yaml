@@ -328,6 +328,14 @@ parameters:
       domain name for cluster DNS
     default: "cluster.local"
 
+  # In case you want to host the kubernetes containers or the core dns
+  # containers. You might not want to use google_containers/kubelet but
+  # my_organization/kubelet.
+  system_container_image_prefix:
+    type: string
+    description: The prefix of the core container images components.
+    default: ""
+
 resources:
 
   ######################################################################
