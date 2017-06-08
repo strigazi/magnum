@@ -13,10 +13,10 @@
 # under the License.
 import os
 
-from magnum.drivers.heat import swarm_fedora_template_def as sftd
+from magnum.drivers.heat import swarm_mode_template_def as sftd
 
 
-class AtomicSwarmTemplateDefinition(sftd.SwarmFedoraTemplateDefinition):
+class AtomicSwarmTemplateDefinition(sftd.SwarmModeTemplateDefinition):
     """Docker swarm template for a Fedora Atomic VM."""
 
     @property
