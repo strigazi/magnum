@@ -32,3 +32,7 @@ class Driver(driver.HeatDriver):
 
     def get_monitor(self, context, cluster):
         return monitor.SwarmMonitor(context, cluster)
+
+    def upgrade_cluster(self, context, cluster, scale_manager=None,
+                        rollback=False):
+        raise NotImplementedError("Must implement 'upgrade_cluster'")

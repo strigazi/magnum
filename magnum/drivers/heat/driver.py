@@ -95,6 +95,10 @@ class HeatDriver(driver.Driver):
         self._update_stack(context, clients.OpenStackClients(context), cluster,
                            scale_manager, rollback)
 
+    @abc.abstractmethod
+    def upgrade_cluster(self):
+        raise NotImplementedError("Must implement 'upgrade_cluster'")
+
     def delete_cluster(self, context, cluster):
         self._delete_stack(context, clients.OpenStackClients(context), cluster)
 

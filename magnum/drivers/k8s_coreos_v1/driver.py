@@ -36,3 +36,7 @@ class Driver(driver.HeatDriver):
 
     def get_scale_manager(self, context, osclient, cluster):
         return K8sScaleManager(context, osclient, cluster)
+
+    def upgrade_cluster(self, context, cluster, scale_manager=None,
+                        rollback=False):
+        raise NotImplementedError("Must implement 'upgrade_cluster'")
