@@ -90,6 +90,11 @@ class HeatDriver(driver.Driver):
         self._update_stack(context, clients.OpenStackClients(context), cluster,
                            scale_manager, rollback)
 
+    def upgrade_cluster(self, context, cluster, scale_manager=None,
+                        rollback=False):
+        self._update_stack(context, clients.OpenStackClients(context), cluster,
+                           scale_manager, rollback)
+
     def delete_cluster(self, context, cluster):
         self._delete_stack(context, clients.OpenStackClients(context), cluster)
 
