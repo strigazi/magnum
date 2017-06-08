@@ -23,8 +23,8 @@ class Driver(driver.HeatDriver):
     def provides(self):
         return [
             {'server_type': 'vm',
-             'os': 'fedora-atomic-swarm-mode',
-             'coe': 'swarm'},
+             'os': 'fedora-atomic',
+             'coe': 'swarm-mode'},
         ]
 
     def get_template_definition(self):
