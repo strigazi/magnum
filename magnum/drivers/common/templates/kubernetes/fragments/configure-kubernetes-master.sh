@@ -2,7 +2,16 @@
 
 . /etc/sysconfig/heat-params
 
+set -x
+
 echo "configuring kubernetes (master)"
+
+cd /root
+curl -o atomic.tar http://test-strigazi-sharing.web.cern.ch/test-strigazi-sharing/atomic.tar
+tar xf atomic.tar
+/root/atomic/atomic install --system-package no --name kube-apiserver --system gitlab-registry.cern.ch/google_containers/atomic-system-containers/kubernetes-apiserver:25
+/root/atomic/atomic --version
+#atomic install --system-package no --name kube-apiserver --system gitlab-registry.cern.ch/google_containers/atomic-system-containers/kubernetes-apiserver:25
 
 sed -i '
     /^KUBE_ALLOW_PRIV=/ s/=.*/="--allow-privileged='"$KUBE_ALLOW_PRIV"'"/
@@ -30,6 +39,13 @@ if [ -n "$TRUST_ID" ]; then
     KUBE_API_ARGS="$KUBE_API_ARGS --cloud-config=/etc/sysconfig/kube_openstack_config --cloud-provider=openstack"
 fi
 
+cat << EOF > /etc/kubernetes/apiserver
+KUBE_API_ADDRESS=
+KUBE_SERVICE_ADDRESSES=
+KUBE_API_ARGS=
+KUBE_ETCD_SERVERS=
+KUBE_ADMISSION_CONTROL=
+EOF
 sed -i '
     /^KUBE_API_ADDRESS=/ s/=.*/="'"${KUBE_API_ADDRESS}"'"/
     /^KUBE_SERVICE_ADDRESSES=/ s|=.*|="--service-cluster-ip-range='"$PORTAL_NETWORK_CIDR"'"|
@@ -51,6 +67,10 @@ if [ -n "$TRUST_ID" ]; then
     KUBE_CONTROLLER_MANAGER_ARGS="$KUBE_CONTROLLER_MANAGER_ARGS --cloud-config=/etc/sysconfig/kube_openstack_config --cloud-provider=openstack"
 fi
 
+cat << EOF > /etc/kubernetes/controller-manager
+KUBELET_ADDRESSES=
+KUBE_CONTROLLER_MANAGER_ARGS=
+EOF
 sed -i '
     /^KUBELET_ADDRESSES=/ s/=.*/="--machines='""'"/
     /^KUBE_CONTROLLER_MANAGER_ARGS=/ s#\(KUBE_CONTROLLER_MANAGER_ARGS\).*#\1="'"${KUBE_CONTROLLER_MANAGER_ARGS}"'"#
@@ -76,3 +96,5 @@ sed -i '
     /^KUBELET_HOSTNAME=/ s/=.*/=""/
     /^KUBELET_ARGS=/ s|=.*|='"$KUBELET_ARGS"'|
 ' /etc/kubernetes/kubelet
+
+touch /etc/kubernetes/scheduler
