@@ -12,7 +12,7 @@ fi
 
 KUBE_DASH_IMAGE="${CONTAINER_INFRA_PREFIX:-gcr.io/google_containers/}kubernetes-dashboard-amd64:${KUBE_DASHBOARD_VERSION}"
 
-KUBE_DASH_DEPLOY=/srv/kubernetes/manifests/kube-dash-deploy.yaml
+KUBE_DASH_DEPLOY=/srv/magnum/kubernetes/manifests/kube-dash-deploy.yaml
 
 [ -f ${KUBE_DASH_DEPLOY} ] || {
     echo "Writing File: $KUBE_DASH_DEPLOY"
@@ -64,7 +64,7 @@ spec:
 EOF
 }
 
-KUBE_DASH_SVC=/srv/kubernetes/manifests/kube-dash-svc.yaml
+KUBE_DASH_SVC=/srv/magnum/kubernetes/manifests/kube-dash-svc.yaml
 [ -f ${KUBE_DASH_SVC} ] || {
     echo "Writing File: $KUBE_DASH_SVC"
     mkdir -p $(dirname ${KUBE_DASH_SVC})
@@ -86,12 +86,12 @@ spec:
 EOF
 }
 
-KUBE_DASH_BIN=/usr/local/bin/kube-dash
+KUBE_DASH_BIN=/srv/magnum/bin/kube-dash
 [ -f ${KUBE_DASH_BIN} ] || {
     echo "Writing File: $KUBE_DASH_BIN"
     mkdir -p $(dirname ${KUBE_DASH_BIN})
     cat << EOF > ${KUBE_DASH_BIN}
-#!/bin/sh
+#!/bin/sh -x
 until curl -sf "http://127.0.0.1:8080/healthz"
 do
     echo "Waiting for Kubernetes API..."
@@ -102,14 +102,14 @@ done
 /usr/bin/kubectl get deployment kube-dashboard --namespace=kube-system
 
 if [ "\$?" != "0" ]; then
-    /usr/bin/kubectl create -f /srv/kubernetes/manifests/kube-dash-deploy.yaml --namespace=kube-system
+    /usr/bin/kubectl create -f ${KUBE_DASH_DEPLOY} --namespace=kube-system
 fi
 
 #echo check for existence of kubernetes-dashboard service
 /usr/bin/kubectl get service kubernetes-dashboard --namespace=kube-system
 
 if [ "\$?" != "0" ]; then
-    /usr/bin/kubectl create -f /srv/kubernetes/manifests/kube-dash-svc.yaml --namespace=kube-system
+    /usr/bin/kubectl create -f ${KUBE_DASH_SVC} --namespace=kube-system
 fi
 EOF
 }
@@ -141,5 +141,5 @@ chmod 0755 ${KUBE_DASH_BIN}
 chown root:root ${KUBE_DASH_SERVICE}
 chmod 0644 ${KUBE_DASH_SERVICE}
 
-systemctl enable kube-dash
-systemctl start --no-block kube-dash
+systemctl enable kube-dash.service
+systemctl start --no-block kube-dash.service
