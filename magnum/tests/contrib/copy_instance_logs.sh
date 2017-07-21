@@ -76,6 +76,9 @@ if [[ "$COE" == "kubernetes" ]]; then
     remote_exec $SSH_USER "sudo df -h" dfh.log
     remote_exec $SSH_USER "sudo journalctl -u wc-notify --no-pager" wc-notify.log
     remote_exec $SSH_USER "sudo cat /etc/sysconfig/heat-params" heat-params
+    remote_exec $SSH_USER "sudo journalctl -u heat-container-agent --no-pager" heat-container-agent.log
+    remote_exec $SSH_USER "sudo journalctl -u kube-dash --no-pager" kube-dash.log
+    remote_exec $SSH_USER "sudo journalctl -u kube-enable-monitoring --no-pager" kube-enable-monitoring.service.log
 elif [[ "$COE" == "swarm" || "$COE" == "swarm-mode" ]]; then
     SSH_USER=fedora
     remote_exec $SSH_USER "sudo systemctl --full list-units --no-pager" systemctl_list_units.log

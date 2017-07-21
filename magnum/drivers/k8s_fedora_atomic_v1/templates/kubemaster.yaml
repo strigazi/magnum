@@ -376,20 +376,20 @@ resources:
   write_prometheus_configmap:
     type: OS::Heat::SoftwareConfig
     properties:
-      group: ungrouped
+      group: script
       config: {get_file: ../../common/templates/kubernetes/fragments/write-prometheus-configmap.yaml}
 
 
   write_prometheus_service:
     type: OS::Heat::SoftwareConfig
     properties:
-      group: ungrouped
+      group: script
       config: {get_file: ../../common/templates/kubernetes/fragments/write-prometheus-service.yaml}
 
   write_grafana_service:
     type: OS::Heat::SoftwareConfig
     properties:
-      group: ungrouped
+      group: script
       config:
         str_replace:
           template: {get_file: ../../common/templates/kubernetes/fragments/write-grafana-service.yaml}
@@ -399,7 +399,7 @@ resources:
   enable_monitoring:
     type: OS::Heat::SoftwareConfig
     properties:
-      group: ungrouped
+      group: script
       config:
         str_replace:
           template: {get_file: ../../common/templates/kubernetes/fragments/enable-monitoring.sh}
@@ -439,7 +439,7 @@ resources:
   kube_ui_service:
     type: OS::Heat::SoftwareConfig
     properties:
-      group: ungrouped
+      group: script
       config: {get_file: ../../common/templates/kubernetes/fragments/kube-dashboard-service.sh}
 
   enable_kube_proxy:
@@ -472,6 +472,12 @@ resources:
       group: ungrouped
       config: {get_file: ../../common/templates/kubernetes/fragments/add-proxy.sh}
 
+  start_container_agent:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/kubernetes/fragments/start-container-agent.sh}
+
   kube_master_init:
     type: OS::Heat::MultipartMime
     properties:
@@ -486,18 +492,57 @@ resources:
         - config: {get_resource: add_proxy}
         - config: {get_resource: enable_services}
         - config: {get_resource: write_network_config}
-        - config: {get_resource: write_prometheus_configmap}
-        - config: {get_resource: write_prometheus_service}
-        - config: {get_resource: write_grafana_service}
         - config: {get_resource: network_config_service}
         - config: {get_resource: network_service}
         - config: {get_resource: kube_system_namespace_service}
         - config: {get_resource: core_dns_service}
         - config: {get_resource: enable_kube_controller_manager_scheduler}
         - config: {get_resource: enable_kube_proxy}
-        - config: {get_resource: kube_ui_service}
-        - config: {get_resource: enable_monitoring}
+        - config: {get_resource: start_container_agent}
         - config: {get_resource: master_wc_notify}
+
+  kubernetes_dashboard_deployment:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      signal_transport: HEAT_SIGNAL
+      config: {get_resource: kube_ui_service}
+      server: {get_resource: kube-master}
+      actions: ['CREATE']
+
+  write_prometheus_configmap_deployment:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      signal_transport: HEAT_SIGNAL
+      config: {get_resource: write_prometheus_configmap}
+      server: {get_resource: kube-master}
+      actions: ['CREATE']
+
+  write_prometheus_service_deployment:
+    type: OS::Heat::SoftwareDeployment
+    depends_on: write_prometheus_configmap_deployment
+    properties:
+      signal_transport: HEAT_SIGNAL
+      config: {get_resource: write_prometheus_service}
+      server: {get_resource: kube-master}
+      actions: ['CREATE']
+
+  write_grafana_service_deployment:
+    type: OS::Heat::SoftwareDeployment
+    depends_on: write_prometheus_service_deployment
+    properties:
+      signal_transport: HEAT_SIGNAL
+      config: {get_resource: write_grafana_service}
+      server: {get_resource: kube-master}
+      actions: ['CREATE']
+
+  enable_monitoring_deployment:
+    type: OS::Heat::SoftwareDeployment
+    depends_on: write_grafana_service_deployment
+    properties:
+      signal_transport: HEAT_SIGNAL
+      config: {get_resource: enable_monitoring}
+      server: {get_resource: kube-master}
+      actions: ['CREATE']
 
   ######################################################################
   #
@@ -513,7 +558,8 @@ resources:
       image: {get_param: server_image}
       flavor: {get_param: master_flavor}
       key_name: {get_param: ssh_key_name}
-      user_data_format: RAW
+      user_data_format: SOFTWARE_CONFIG
+      software_config_transport: POLL_SERVER_HEAT
       user_data: {get_resource: kube_master_init}
       networks:
         - port: {get_resource: kube_master_eth0}

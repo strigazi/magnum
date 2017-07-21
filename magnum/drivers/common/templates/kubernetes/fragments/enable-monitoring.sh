@@ -19,9 +19,10 @@ EOF
     }
 }
 
-KUBE_MON_BIN=/usr/local/bin/kube-enable-monitoring
-KUBE_MON_SERVICE=/etc/systemd/system/kube-enable-monitoring.service
-GRAFANA_DEF_DASHBOARDS="/var/lib/grafana/dashboards"
+PROMETHEUS_MON_BASE_DIR="/srv/magnum/kubernetes/monitoring"
+KUBE_MON_BIN=${PROMETHEUS_MON_BASE_DIR}"/bin/kube-enable-monitoring"
+KUBE_MON_SERVICE="/etc/systemd/system/kube-enable-monitoring.service"
+GRAFANA_DEF_DASHBOARDS=${PROMETHEUS_MON_BASE_DIR}"/dashboards"
 GRAFANA_DEF_DASHBOARD_FILE=$GRAFANA_DEF_DASHBOARDS"/default.json"
 
 # Write the binary for enable-monitoring
@@ -36,15 +37,15 @@ done
 # Check if configmap Prometheus exists
 kubectl get configmap prometheus -n kube-system
 if [ "$?" != "0" ] && \
-        [ -f "/srv/kubernetes/monitoring/prometheusConfigMap.yaml" ]; then
-    kubectl create -f /srv/kubernetes/monitoring/prometheusConfigMap.yaml
+        [ -f "'''${PROMETHEUS_MON_BASE_DIR}'''/prometheusConfigMap.yaml" ]; then
+    kubectl create -f '''${PROMETHEUS_MON_BASE_DIR}'''/prometheusConfigMap.yaml
 fi
 
 # Check if deployment and service Prometheus exist
 kubectl get service prometheus -n kube-system | kubectl get deployment prometheus -n kube-system
 if [ "${PIPESTATUS[0]}" != "0" ] && [ "${PIPESTATUS[1]}" != "0" ] && \
-        [ -f "/srv/kubernetes/monitoring/prometheusService.yaml" ]; then
-    kubectl create -f /srv/kubernetes/monitoring/prometheusService.yaml
+        [ -f "'''${PROMETHEUS_MON_BASE_DIR}'''/prometheusService.yaml" ]; then
+    kubectl create -f '''${PROMETHEUS_MON_BASE_DIR}'''/prometheusService.yaml
 fi
 
 # Check if configmap graf-dash exists
@@ -57,8 +58,8 @@ fi
 # Check if deployment and service Grafana exist
 kubectl get service grafana -n kube-system | kubectl get deployment grafana -n kube-system
 if [ "${PIPESTATUS[0]}" != "0" ] && [ "${PIPESTATUS[1]}" != "0" ] && \
-        [ -f "/srv/kubernetes/monitoring/grafanaService.yaml" ]; then
-    kubectl create -f /srv/kubernetes/monitoring/grafanaService.yaml
+        [ -f "'''${PROMETHEUS_MON_BASE_DIR}'''/grafanaService.yaml" ]; then
+    kubectl create -f '''${PROMETHEUS_MON_BASE_DIR}'''/grafanaService.yaml
 fi
 
 # Wait for Grafana pod and then inject data source
@@ -135,5 +136,7 @@ if [ -f $GRAFANA_DEF_DASHBOARD_FILE ]; then
 fi
 
 # Launch the monitoring service
-systemctl enable kube-enable-monitoring
-systemctl start --no-block kube-enable-monitoring
+set -x
+systemctl daemon-reload
+systemctl enable kube-enable-monitoring.service
+systemctl start --no-block kube-enable-monitoring.service
