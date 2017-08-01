@@ -18,6 +18,17 @@ create-monitor=yes
 monitor-delay=1m
 monitor-timeout=30s
 monitor-max-retries=3
+EOF
+
+
+KUBE_NUMERIC_VERSION=${KUBE_VERSION:1}
+IFS=. read KUBE_MAJOR KUBE_MINOR KUBE_PATCH <<EOF
+${KUBE_NUMERIC_VERSION##*-}
+EOF
+
+if [ "$KUBE_MAJOR" -eq "1" -a "$KUBE_MINOR" -ge "7" ] || [ "$KUBE_MAJOR" -ge "2" ]; then
+    cat >> $KUBE_OS_CLOUD_CONFIG <<EOF
 [BlockStorage]
 bs-version=v2
 EOF
+fi
