@@ -318,6 +318,11 @@ parameters:
     description: version of kubernetes used for kubernetes cluster
     default: v1.5.3
 
+  kube_tag:
+    type: string
+    description: version of kubernetes used for kubernetes cluster
+    default: v1.5.3
+
   kube_dashboard_version:
     type: string
     description: version of kubernetes dashboard used for kubernetes cluster
@@ -505,6 +510,7 @@ resources:
           https_proxy: {get_param: https_proxy}
           no_proxy: {get_param: no_proxy}
           kube_version: {get_param: kube_version}
+          kube_tag: {get_param: kube_tag}
           kube_dashboard_version: {get_param: kube_dashboard_version}
           trustee_user_id: {get_param: trustee_user_id}
           trustee_password: {get_param: trustee_password}

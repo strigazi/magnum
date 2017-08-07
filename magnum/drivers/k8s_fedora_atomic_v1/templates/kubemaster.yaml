@@ -7,6 +7,10 @@ description: >
 
 parameters:
 
+  kube_tag:
+    type: string
+    description: glance image used to boot the server
+
   server_image:
     type: string
     description: glance image used to boot the server
@@ -500,6 +504,25 @@ resources:
         - config: {get_resource: enable_kube_proxy}
         - config: {get_resource: start_container_agent}
         - config: {get_resource: master_wc_notify}
+
+  write_kube_tag:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      inputs:
+      - name: kube_tag_input
+      config:
+        get_file: ../../common/templates/kubernetes/fragments/write-kube-tag.sh
+
+  write_kube_tag_deployment:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      signal_transport: HEAT_SIGNAL
+      config: {get_resource: write_kube_tag}
+      server: {get_resource: kube-master}
+      actions: ['UPDATE']
+      input_values:
+        kube_tag_input: {get_param: kube_tag}
 
   kubernetes_dashboard_deployment:
     type: OS::Heat::SoftwareDeployment
