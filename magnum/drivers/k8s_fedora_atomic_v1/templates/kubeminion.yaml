@@ -378,6 +378,12 @@ resources:
       group: ungrouped
       config: {get_file: ../../common/templates/kubernetes/fragments/add-proxy.sh}
 
+  start_container_agent:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ungrouped
+      config: {get_file: ../../common/templates/kubernetes/fragments/start-container-agent.sh}
+
   kube_minion_init:
     type: OS::Heat::MultipartMime
     properties:
@@ -396,6 +402,26 @@ resources:
         - config: {get_resource: enable_node_exporter}
         - config: {get_resource: enable_docker_registry}
         - config: {get_resource: minion_wc_notify}
+        - config: {get_resource: start_container_agent}
+
+  upgrade_kubernetes:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      inputs:
+      - name: kube_tag_input
+      config:
+        get_file: ../../common/templates/kubernetes/fragments/upgrade-kubernetes.sh
+
+  upgrade_kubernetes_deployment:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      signal_transport: HEAT_SIGNAL
+      config: {get_resource: upgrade_kubernetes}
+      server: {get_resource: kube-minion}
+      actions: ['UPDATE']
+      input_values:
+        kube_tag_input: {get_param: kube_tag}
 
   ######################################################################
   #
@@ -412,7 +438,7 @@ resources:
       image: {get_param: server_image}
       flavor: {get_param: minion_flavor}
       key_name: {get_param: ssh_key_name}
-      user_data_format: RAW
+      user_data_format: SOFTWARE_CONFIG
       user_data: {get_resource: kube_minion_init}
       networks:
         - port: {get_resource: kube_minion_eth0}

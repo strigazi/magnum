@@ -30,6 +30,10 @@ parameters:
     type: string
     description: glance image used to boot the server
 
+  minion_image:
+    type: string
+    description: glance image used to boot the server
+
   master_flavor:
     type: string
     default: m1.small
@@ -308,7 +312,12 @@ parameters:
     type: string
     description: url for keystone
 
-  kube_tag:
+  master_kube_tag:
+    type: string
+    description: tag of the k8s containers used to provision the kubernetes cluster
+    default: v1.7.4
+
+  minion_kube_tag:
     type: string
     description: tag of the k8s containers used to provision the kubernetes cluster
     default: v1.7.4
@@ -468,6 +477,8 @@ resources:
     type: OS::Heat::ResourceGroup
     depends_on:
       - network
+    update_policy:
+      rolling_update: {max_batch_size: 1, pause_time: 30}
     properties:
       count: {get_param: number_of_masters}
       resource_def:
@@ -516,7 +527,7 @@ resources:
           http_proxy: {get_param: http_proxy}
           https_proxy: {get_param: https_proxy}
           no_proxy: {get_param: no_proxy}
-          kube_tag: {get_param: kube_tag}
+          kube_tag: {get_param: master_kube_tag}
           kube_version: {get_param: kube_version}
           kube_dashboard_version: {get_param: kube_dashboard_version}
           trustee_user_id: {get_param: trustee_user_id}
@@ -539,6 +550,8 @@ resources:
     type: OS::Heat::ResourceGroup
     depends_on:
       - network
+    update_policy:
+      rolling_update: {max_batch_size: 1, pause_time: 30}
     properties:
       count: {get_param: number_of_minions}
       removal_policies: [{resource_list: {get_param: minions_to_remove}}]
@@ -551,7 +564,7 @@ resources:
               - [{ get_param: 'OS::stack_name' }, 'minion', '%index%']
           prometheus_monitoring: {get_param: prometheus_monitoring}
           ssh_key_name: {get_param: ssh_key_name}
-          server_image: {get_param: server_image}
+          server_image: {get_param: minion_image}
           minion_flavor: {get_param: minion_flavor}
           fixed_network: {get_attr: [network, fixed_network]}
           fixed_subnet: {get_attr: [network, fixed_subnet]}
@@ -584,7 +597,7 @@ resources:
           http_proxy: {get_param: http_proxy}
           https_proxy: {get_param: https_proxy}
           no_proxy: {get_param: no_proxy}
-          kube_tag: {get_param: kube_tag}
+          kube_tag: {get_param: minion_kube_tag}
           kube_version: {get_param: kube_version}
           trustee_user_id: {get_param: trustee_user_id}
           trustee_username: {get_param: trustee_username}

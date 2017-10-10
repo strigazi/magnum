@@ -58,6 +58,8 @@ class K8sFedoraTemplateDefinition(k8s_template_def.K8sTemplateDefinition):
                            cluster_attr='docker_volume_size')
         self.add_parameter('docker_storage_driver',
                            cluster_template_attr='docker_storage_driver')
+        self.add_parameter('minion_image',
+                           cluster_template_attr='image_id')
         self.add_output('kube_minions',
                         cluster_attr='node_addresses',
                         mapping_type=NodeAddressOutputMapping)
@@ -80,7 +82,8 @@ class K8sFedoraTemplateDefinition(k8s_template_def.K8sTemplateDefinition):
 
         kube_tag = cluster_template.labels.get('kube_tag')
         if kube_tag:
-            extra_params['kube_tag'] = kube_tag
+            extra_params['master_kube_tag'] = kube_tag
+            extra_params['minion_kube_tag'] = kube_tag
 
         container_infra_prefix = cluster_template.labels.get(
             'container_infra_prefix')
