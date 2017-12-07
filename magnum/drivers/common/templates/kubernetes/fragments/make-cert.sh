@@ -67,9 +67,12 @@ cert_dir=/etc/kubernetes/certs
 mkdir -p "$cert_dir"
 
 CA_CERT=$cert_dir/ca.crt
-SERVER_CERT=$cert_dir/server.crt
-SERVER_CSR=$cert_dir/server.csr
-SERVER_KEY=$cert_dir/server.key
+APISERVER_CERT=$cert_dir/apiserver.crt
+APISERVER_CSR=$cert_dir/apiserver.csr
+APISERVER_KEY=$cert_dir/apiserver.key
+ADMIN_CERT=$cert_dir/admin.crt
+ADMIN_CSR=$cert_dir/admin.csr
+ADMIN_KEY=$cert_dir/admin.key
 
 #Get a token by user credentials and trust
 auth_json=$(cat << EOF
@@ -102,36 +105,75 @@ curl $VERIFY_CA -X GET \
     -H "OpenStack-API-Version: container-infra latest" \
     $MAGNUM_URL/certificates/$CLUSTER_UUID | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > ${CA_CERT}
 
-# Create config for server's csr
-cat > ${cert_dir}/server.conf <<EOF
+# Create config for apiserver's csr
+cat > ${cert_dir}/apiserver.conf <<EOF
 [req]
 distinguished_name = req_distinguished_name
 req_extensions     = req_ext
 prompt = no
 [req_distinguished_name]
-CN = kubernetes.default.svc
+CN = kubernetes
 [req_ext]
 subjectAltName = ${sans}
 extendedKeyUsage = clientAuth,serverAuth
 EOF
 
 # Generate server's private key and csr
-openssl genrsa -out "${SERVER_KEY}" 4096
-chmod 400 "${SERVER_KEY}"
+openssl genrsa -out "${APISERVER_KEY}" 4096
+chmod 400 "${APISERVER_KEY}"
 openssl req -new -days 1000 \
-        -key "${SERVER_KEY}" \
-        -out "${SERVER_CSR}" \
+        -key "${APISERVER_KEY}" \
+        -out "${APISERVER_CSR}" \
         -reqexts req_ext \
-        -config "${cert_dir}/server.conf"
+        -config "${cert_dir}/apiserver.conf"
 
 # Send csr to Magnum to have it signed
-csr_req=$(python -c "import json; fp = open('${SERVER_CSR}'); print json.dumps({'cluster_uuid': '$CLUSTER_UUID', 'csr': fp.read()}); fp.close()")
+csr_req=$(python -c "import json; fp = open('${APISERVER_CSR}'); print json.dumps({'cluster_uuid': '$CLUSTER_UUID', 'csr': fp.read()}); fp.close()")
 curl $VERIFY_CA -X POST \
     -H "X-Auth-Token: $USER_TOKEN" \
     -H "OpenStack-API-Version: container-infra latest" \
     -H "Content-Type: application/json" \
     -d "$csr_req" \
-    $MAGNUM_URL/certificates | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > ${SERVER_CERT}
+    $MAGNUM_URL/certificates | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > ${APISERVER_CERT}
+
+# Create config for ADMIN's csr
+cat > ${cert_dir}/admin.conf <<EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+prompt = no
+[req_distinguished_name]
+CN = admin
+O=system:masters
+OU=OpenStack/Magnum
+C=US
+ST=TX
+L=Austin
+[req_ext]
+subjectAltName = ${sans}
+extendedKeyUsage = clientAuth,serverAuth
+EOF
+
+# Generate server's private key and csr
+openssl genrsa -out "${ADMIN_KEY}" 4096
+chmod 400 "${ADMIN_KEY}"
+openssl req -new -days 1000 \
+        -key "${ADMIN_KEY}" \
+        -out "${ADMIN_CSR}" \
+        -reqexts req_ext \
+        -config "${cert_dir}/admin.conf"
+
+# Send csr to Magnum to have it signed
+csr_req=$(python -c "import json; fp = open('${ADMIN_CSR}'); print json.dumps({'cluster_uuid': '$CLUSTER_UUID', 'csr': fp.read()}); fp.close()")
+curl $VERIFY_CA -X POST \
+    -H "X-Auth-Token: $USER_TOKEN" \
+    -H "OpenStack-API-Version: container-infra latest" \
+    -H "Content-Type: application/json" \
+    -d "$csr_req" \
+    $MAGNUM_URL/certificates | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > ${ADMIN_CERT}
+
+cp ${cert_dir}/apiserver.crt ${cert_dir}/server.crt
+cp ${cert_dir}/apiserver.key ${cert_dir}/server.key
 
 # Common certs and key are created for both etcd and kubernetes services.
 # Both etcd and kube user should have permission to access the certs and key.
@@ -140,4 +182,6 @@ usermod -a -G kube_etcd etcd
 usermod -a -G kube_etcd kube
 chmod 550 "${cert_dir}"
 chown -R kube:kube_etcd "${cert_dir}"
-chmod 440 $SERVER_KEY
+chmod 440 $APISERVER_KEY
+chmod 440 $ADMIN_KEY
+chmod 440 ${cert_dir}/server.key

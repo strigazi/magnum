@@ -35,9 +35,12 @@ cert_dir=/etc/kubernetes/certs
 mkdir -p "$cert_dir"
 
 CA_CERT=$cert_dir/ca.crt
-CLIENT_CERT=$cert_dir/client.crt
-CLIENT_CSR=$cert_dir/client.csr
-CLIENT_KEY=$cert_dir/client.key
+KUBELET_CERT=$cert_dir/kubelet.crt
+KUBELET_CSR=$cert_dir/kubelet.csr
+KUBELET_KEY=$cert_dir/kubelet.key
+PROXY_CERT=$cert_dir/proxy.crt
+PROXY_CSR=$cert_dir/proxy.csr
+PROXY_KEY=$cert_dir/proxy.key
 
 #Get a token by user credentials and trust
 auth_json=$(cat << EOF
@@ -70,41 +73,79 @@ curl $VERIFY_CA -X GET \
     -H "OpenStack-API-Version: container-infra latest" \
     $MAGNUM_URL/certificates/$CLUSTER_UUID | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > $CA_CERT
 
-# Create config for client's csr
-cat > ${cert_dir}/client.conf <<EOF
+#Kubelet Certs
+INSTANCE_NAME=$(hostname --short | sed 's/\.novalocal//')
+
+cat > ${cert_dir}/kubelet.conf <<EOF
 [req]
 distinguished_name = req_distinguished_name
 req_extensions     = req_ext
 prompt = no
 [req_distinguished_name]
-CN = kubernetes.default.svc
+CN = system:node:${INSTANCE_NAME}
+O=system:nodes
+OU=OpenStack/Magnum
+C=US
+ST=TX
+L=Austin
 [req_ext]
 keyUsage=critical,digitalSignature,keyEncipherment
 extendedKeyUsage=clientAuth
-subjectAltName=dirName:kubelet,dirName:kubeproxy
-[kubelet]
-CN=kubelet
-[kubeproxy]
-CN=kube-proxy
 EOF
 
 # Generate client's private key and csr
-openssl genrsa -out "${CLIENT_KEY}" 4096
-chmod 400 "${CLIENT_KEY}"
+openssl genrsa -out "${KUBELET_KEY}" 4096
+chmod 400 "${KUBELET_KEY}"
 openssl req -new -days 1000 \
-        -key "${CLIENT_KEY}" \
-        -out "${CLIENT_CSR}" \
+        -key "${KUBELET_KEY}" \
+        -out "${KUBELET_CSR}" \
         -reqexts req_ext \
-        -config "${cert_dir}/client.conf"
+        -config "${cert_dir}/kubelet.conf"
 
 # Send csr to Magnum to have it signed
-csr_req=$(python -c "import json; fp = open('${CLIENT_CSR}'); print json.dumps({'cluster_uuid': '$CLUSTER_UUID', 'csr': fp.read()}); fp.close()")
+csr_req=$(python -c "import json; fp = open('${KUBELET_CSR}'); print json.dumps({'cluster_uuid': '$CLUSTER_UUID', 'csr': fp.read()}); fp.close()")
 curl  $VERIFY_CA -X POST \
     -H "X-Auth-Token: $USER_TOKEN" \
     -H "OpenStack-API-Version: container-infra latest" \
     -H "Content-Type: application/json" \
     -d "$csr_req" \
-    $MAGNUM_URL/certificates | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > ${CLIENT_CERT}
+    $MAGNUM_URL/certificates | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > ${KUBELET_CERT}
+
+#kube-proxy Certs
+cat > ${cert_dir}/proxy.conf <<EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+prompt = no
+[req_distinguished_name]
+CN = system:kube-proxy
+O=system:node-proxier
+OU=OpenStack/Magnum
+C=US
+ST=TX
+L=Austin
+[req_ext]
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=clientAuth
+EOF
+
+# Generate client's private key and csr
+openssl genrsa -out "${PROXY_KEY}" 4096
+chmod 400 "${PROXY_KEY}"
+openssl req -new -days 1000 \
+        -key "${PROXY_KEY}" \
+        -out "${PROXY_CSR}" \
+        -reqexts req_ext \
+        -config "${cert_dir}/proxy.conf"
+
+# Send csr to Magnum to have it signed
+csr_req=$(python -c "import json; fp = open('${PROXY_CSR}'); print json.dumps({'cluster_uuid': '$CLUSTER_UUID', 'csr': fp.read()}); fp.close()")
+curl  $VERIFY_CA -X POST \
+    -H "X-Auth-Token: $USER_TOKEN" \
+    -H "OpenStack-API-Version: container-infra latest" \
+    -H "Content-Type: application/json" \
+    -d "$csr_req" \
+    $MAGNUM_URL/certificates | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > ${PROXY_CERT}
 
 # Common certs and key are created for both etcd and kubernetes services.
 # Both etcd and kube user should have permission to access the certs and key.
@@ -113,4 +154,5 @@ usermod -a -G kube_etcd etcd
 usermod -a -G kube_etcd kube
 chmod 550 "${cert_dir}"
 chown -R kube:kube_etcd "${cert_dir}"
-chmod 440 $CLIENT_KEY
+chmod 440 $KUBELET_KEY
+chmod 440 $PROXY_KEY

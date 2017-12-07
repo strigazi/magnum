@@ -4,7 +4,8 @@
 
 echo "configuring kubernetes (master)"
 
-_prefix=${CONTAINER_INFRA_PREFIX:-docker.io/openstackmagnum/}
+_prefix="gitlab-registry.cern.ch/cloud/atomic-system-containers/"
+KUBE_TAG="v1.8.0-1"
 atomic install --storage ostree --system --system-package=no --name=kubelet ${_prefix}kubernetes-kubelet:${KUBE_TAG}
 atomic install --storage ostree --system --system-package=no --name=kube-proxy ${_prefix}kubernetes-proxy:${KUBE_TAG}
 atomic install --storage ostree --system --system-package=no --name=kube-apiserver ${_prefix}kubernetes-apiserver:${KUBE_TAG}
@@ -26,14 +27,14 @@ else
     KUBE_API_ADDRESS="--bind-address=0.0.0.0 --secure-port=$KUBE_API_PORT"
     # insecure port is used internaly
     KUBE_API_ADDRESS="$KUBE_API_ADDRESS --insecure-port=8080"
-    KUBE_API_ARGS="$KUBE_API_ARGS --tls-cert-file=$CERT_DIR/server.crt"
-    KUBE_API_ARGS="$KUBE_API_ARGS --tls-private-key-file=$CERT_DIR/server.key"
+    KUBE_API_ARGS="$KUBE_API_ARGS --authorization-mode=Node,RBAC --tls-cert-file=$CERT_DIR/apiserver.crt"
+    KUBE_API_ARGS="$KUBE_API_ARGS --tls-private-key-file=$CERT_DIR/apiserver.key"
     KUBE_API_ARGS="$KUBE_API_ARGS --client-ca-file=$CERT_DIR/ca.crt"
 fi
 
 KUBE_ADMISSION_CONTROL=""
 if [ -n "${ADMISSION_CONTROL_LIST}" ] && [ "${TLS_DISABLED}" == "False" ]; then
-    KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL_LIST}"
+    KUBE_ADMISSION_CONTROL="--admission-control=NodeRestriction,${ADMISSION_CONTROL_LIST}"
 fi
 
 if [ -n "$TRUST_ID" ]; then
@@ -52,7 +53,7 @@ sed -i '
 # Add controller manager args
 KUBE_CONTROLLER_MANAGER_ARGS="--leader-elect=true"
 if [ -n "${ADMISSION_CONTROL_LIST}" ] && [ "${TLS_DISABLED}" == "False" ]; then
-    KUBE_CONTROLLER_MANAGER_ARGS="$KUBE_CONTROLLER_MANAGER_ARGS --service-account-private-key-file=$CERT_DIR/server.key --root-ca-file=$CERT_DIR/ca.crt"
+    KUBE_CONTROLLER_MANAGER_ARGS="$KUBE_CONTROLLER_MANAGER_ARGS --service-account-private-key-file=$CERT_DIR/apiserver.key --root-ca-file=$CERT_DIR/ca.crt"
 fi
 
 if [ -n "$TRUST_ID" ]; then
