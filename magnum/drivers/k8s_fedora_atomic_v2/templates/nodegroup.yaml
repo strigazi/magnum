@@ -1,0 +1,115 @@
+heat_template_version: queens
+
+parameters:
+  slave_count:
+    type: number
+    label: Slave Count
+    description: Number of slaves
+    default: 2
+  name:
+    type: string
+    label: name
+    default: name
+  image_id:
+    type: string
+    label: Image ID
+    description: Image to be used
+    default: d9af69c3-ba98-4348-b59b-dc6cacce3d7d
+  key_name:
+    type: string
+    label: Key Name
+    description: SSH key to be used for all instances
+    default: admin
+  flavor:
+    type: string
+    label: Instance Type
+    description: Type of instance (flavor) to deploy
+    default: m1.small
+  nodes_to_remove:
+    type: comma_delimited_list
+    label: nodes to remove
+    default: []
+  nodegroup_role:
+    type: string
+  master_sec_group:
+    type: string
+  worker_sec_group:
+    type: string
+  master_lb_enabled:
+    type: boolean
+  floating_ip_enabled:
+    type: boolean
+  external_network:
+    type: string
+    description: uuid/name of a network to use for floating ip addresses
+    default: public
+  api_pool_id:
+    type: string
+    description: ID of the load balancer pool of k8s API server.
+    default: ""
+  fixed_network:
+    type: string
+    description: uuid/name of an existing network to use to provision machines
+    default: ""
+  fixed_subnet:
+    type: string
+    description: uuid/name of an existing subnet to use to provision machines
+    default: ""
+  ng_uuid:
+    type: string
+
+  node_software_configs:
+    type: string
+
+  node_common_deployment:
+    type: string
+
+  octavia_enabled:
+    type: boolean
+
+resources:
+  slaveresources:
+    type: OS::Heat::ResourceGroup
+    properties:
+      removal_policies: [ {resource_list: {get_param: nodes_to_remove }} ]
+      removal_policies_mode: update
+      count: { get_param: slave_count }
+      resource_def:
+        type: node.yaml
+        properties:
+          key_name: { get_param: key_name }
+          image: { get_param: image_id }
+          flavor: { get_param: flavor }
+          name:
+            list_join:
+              - '-'
+              - [{ get_param: name }, '%index%']
+          role: {get_param: nodegroup_role}
+          secgroup: {if: ["is_master", { get_param: master_sec_group }, { get_param: worker_sec_group }] }
+          master_lb_enabled: { get_param: master_lb_enabled }
+          floating_ip_enabled: { get_param: floating_ip_enabled }
+          external_network: { get_param: external_network }
+          api_pool_id: { get_param: api_pool_id }
+          fixed_network: { get_param: fixed_network }
+          fixed_subnet: {get_param: fixed_subnet }
+          node_software_configs: {get_param: node_software_configs}
+          node_common_deployment: {get_param: node_common_deployment}
+          octavia_enabled: {get_param: octavia_enabled}
+
+outputs:
+  nodegroups_server_id:
+    value: { get_attr: [ slaveresources, node_server_id ] }
+  node_id_map:
+    value: 
+      map_merge: { get_attr: [ slaveresources, node_id_map ] }
+  node_ips:
+    value: { get_attr: [ slaveresources, node_ip] }
+  node_ips_per_ng:
+    value:
+      map_replace:
+      - nodegroup: { get_attr: [slaveresources, node_ip] }
+      - keys: { nodegroup: {get_param: ng_uuid }}
+
+conditions:
+  is_master: {equals : [{get_param: nodegroup_role}, "master"]}
+  is_minion: {not: {equals : [{get_param: role}, "master"]}}

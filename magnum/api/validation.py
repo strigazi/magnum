@@ -237,7 +237,7 @@ class Validator(object):
 
     @classmethod
     def get_coe_validator(cls, coe):
-        if coe == 'kubernetes':
+        if coe in ['kubernetes', 'kubernetes-ng']:
             return K8sValidator()
         elif coe == 'swarm' or coe == 'swarm-mode':
             return SwarmValidator()

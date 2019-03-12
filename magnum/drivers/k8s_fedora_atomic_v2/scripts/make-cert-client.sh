@@ -16,7 +16,6 @@
 
 . /etc/sysconfig/heat-params
 
-set -x
 set -o errexit
 set -o pipefail
 
@@ -34,46 +33,10 @@ if [ -z "${KUBE_NODE_IP}" ]; then
     KUBE_NODE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 fi
 
-sans="IP:${KUBE_NODE_IP}"
-
-if [ -z "${KUBE_NODE_PUBLIC_IP}" ]; then
-    KUBE_NODE_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-fi
-
-if [ -n "${KUBE_NODE_PUBLIC_IP}" ]; then
-    sans="${sans},IP:${KUBE_NODE_PUBLIC_IP}"
-fi
-
-if [ "${KUBE_NODE_PUBLIC_IP}" != "${KUBE_API_PUBLIC_ADDRESS}" ] \
-        && [ -n "${KUBE_API_PUBLIC_ADDRESS}" ]; then
-    sans="${sans},IP:${KUBE_API_PUBLIC_ADDRESS}"
-fi
-
-if [ "${KUBE_NODE_IP}" != "${KUBE_API_PRIVATE_ADDRESS}" ] \
-        && [ -n "${KUBE_API_PRIVATE_ADDRESS}" ]; then
-    sans="${sans},IP:${KUBE_API_PRIVATE_ADDRESS}"
-fi
-
-MASTER_HOSTNAME=${MASTER_HOSTNAME:-}
-if [ -n "${MASTER_HOSTNAME}" ]; then
-    sans="${sans},DNS:${MASTER_HOSTNAME}"
-fi
-
-if [ -n "${ETCD_LB_VIP}" ]; then
-    sans="${sans},IP:${ETCD_LB_VIP}"
-fi
-
-sans="${sans},IP:127.0.0.1"
-
-KUBE_SERVICE_IP=$(echo $PORTAL_NETWORK_CIDR | awk 'BEGIN{FS="[./]"; OFS="."}{print $1,$2,$3,$4 + 1}')
-
-sans="${sans},IP:${KUBE_SERVICE_IP}"
-
-sans="${sans},DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local"
-
-echo "sans is ${sans}"
 cert_dir=/etc/kubernetes/certs
+
 mkdir -p "$cert_dir"
+
 CA_CERT=$cert_dir/ca.crt
 
 function generate_certificates {
@@ -81,7 +44,6 @@ function generate_certificates {
     _CSR=$cert_dir/${1}.csr
     _KEY=$cert_dir/${1}.key
     _CONF=$2
-
     #Get a token by user credentials and trust
     auth_json=$(cat << EOF
 {
@@ -111,9 +73,9 @@ EOF
     curl $VERIFY_CA -X GET \
         -H "X-Auth-Token: $USER_TOKEN" \
         -H "OpenStack-API-Version: container-infra latest" \
-        $MAGNUM_URL/certificates/$CLUSTER_UUID | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > ${CA_CERT}
+        $MAGNUM_URL/certificates/$CLUSTER_UUID | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > $CA_CERT
 
-    # Generate server's private key and csr
+    # Generate client's private key and csr
     openssl genrsa -out "${_KEY}" 4096
     chmod 400 "${_KEY}"
     openssl req -new -days 1000 \
@@ -124,7 +86,7 @@ EOF
 
     # Send csr to Magnum to have it signed
     csr_req=$(python -c "import json; fp = open('${_CSR}'); print json.dumps({'cluster_uuid': '$CLUSTER_UUID', 'csr': fp.read()}); fp.close()")
-    curl $VERIFY_CA -X POST \
+    curl  $VERIFY_CA -X POST \
         -H "X-Auth-Token: $USER_TOKEN" \
         -H "OpenStack-API-Version: container-infra latest" \
         -H "Content-Type: application/json" \
@@ -132,21 +94,10 @@ EOF
         $MAGNUM_URL/certificates | python -c 'import sys, json; print json.load(sys.stdin)["pem"]' > ${_CERT}
 }
 
-# Create config for server's csr
-cat > ${cert_dir}/server.conf <<EOF
-[req]
-distinguished_name = req_distinguished_name
-req_extensions     = req_ext
-prompt = no
-[req_distinguished_name]
-CN = kubernetes
-[req_ext]
-subjectAltName = ${sans}
-extendedKeyUsage = clientAuth,serverAuth
-EOF
-
 #Kubelet Certs
-INSTANCE_NAME=$(hostname --short | sed 's/\.novalocal//')
+INSTANCE_NAME=$(cat /etc/hostname  | sed 's/.novalocal//')
+HOSTNAME=$(cat /etc/hostname)
+
 cat > ${cert_dir}/kubelet.conf <<EOF
 [req]
 distinguished_name = req_distinguished_name
@@ -160,25 +111,33 @@ C=US
 ST=TX
 L=Austin
 [req_ext]
-subjectAltName = ${sans}
+subjectAltName = IP:${KUBE_NODE_IP},DNS:${INSTANCE_NAME},DNS:${HOSTNAME}
 keyUsage=critical,digitalSignature,keyEncipherment
 extendedKeyUsage=clientAuth,serverAuth
 EOF
 
-generate_certificates server ${cert_dir}/server.conf
-generate_certificates kubelet ${cert_dir}/kubelet.conf
+#kube-proxy Certs
+cat > ${cert_dir}/proxy.conf <<EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+prompt = no
+[req_distinguished_name]
+CN = system:kube-proxy
+O=system:node-proxier
+OU=OpenStack/Magnum
+C=US
+ST=TX
+L=Austin
+[req_ext]
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=clientAuth
+EOF
 
-# Generate service account key and private key
-echo -e "${KUBE_SERVICE_ACCOUNT_KEY}" > ${cert_dir}/service_account.key
-echo -e "${KUBE_SERVICE_ACCOUNT_PRIVATE_KEY}" > ${cert_dir}/service_account_private.key
+generate_certificates kubelet ${cert_dir}/kubelet.conf
+generate_certificates proxy ${cert_dir}/proxy.conf
 
 # Common certs and key are created for both etcd and kubernetes services.
 # Both etcd and kube user should have permission to access the certs and key.
-groupadd kube_etcd
-usermod -a -G kube_etcd etcd
-usermod -a -G kube_etcd kube
-chmod 550 "${cert_dir}"
-chown -R kube:kube_etcd "${cert_dir}"
-chmod 440 $cert_dir/server.key
-mkdir -p /etc/etcd/certs
-cp ${cert_dir}/* /etc/etcd/certs
+chmod 440 ${cert_dir}/kubelet.key
+chmod 440 ${cert_dir}/proxy.key

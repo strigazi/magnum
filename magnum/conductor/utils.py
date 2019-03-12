@@ -129,7 +129,8 @@ def _get_nodegroup_object(context, cluster, node_count, is_master=False):
                         cluster.cluster_template.master_flavor_id)
         ng.role = "master"
     else:
-        ng.flavor_id = cluster.flavor_id or cluster.cluster_template.flavor_id
+        ng.flavor_id = cluster.flavor_id or \
+            cluster.cluster_template.flavor_id or 'm1.small'
         ng.role = "worker"
     ng.name = "default-%s" % ng.role
     ng.is_default = True

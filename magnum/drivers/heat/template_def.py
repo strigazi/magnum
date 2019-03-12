@@ -91,6 +91,27 @@ class NodeGroupParameterMapping(ParameterMapping):
         self.required = required
         self.param_type = param_type
 
+    def set_param(self, params, cluster_template, cluster):
+        value = self.get_value(cluster_template, cluster)
+        if self.required and value is None:
+            kwargs = dict(heat_param=self.heat_param)
+            raise exception.RequiredParameterNotProvided(**kwargs)
+
+        if value is not None:
+            if self.param_type == "JSONList":
+                if self.heat_param in params:
+                    params[self.heat_param].append(value)
+                else:
+                    params[self.heat_param] = [value]
+            elif self.param_type == "JSONDict":
+                value = {self.nodegroup_uuid: value}
+                if self.heat_param in params:
+                    params[self.heat_param].update(value)
+                else:
+                    params[self.heat_param] = value
+            else:
+                params[self.heat_param] = self.param_type(value)
+
     def get_value(self, cluster_template, cluster):
         value = None
         for ng in cluster.nodegroups:
@@ -160,6 +181,8 @@ class NodeGroupOutputMapping(OutputMapping):
                 # nodegroups are fetched from the database every
                 # time, so the bad thing here is that we need to
                 # save each change.
+                if self.heat_output == 'ng_node_ips':
+                    LOG.error('TSIOU %s %s', self.nodegroup_uuid, output_value)
                 setattr(ng, self.nodegroup_attr, output_value)
                 ng.save()
 
@@ -174,6 +197,17 @@ class NodeGroupOutputMapping(OutputMapping):
                 return value
 
         LOG.warning('stack does not have param %s', self.heat_output)
+        return None
+
+
+class NodeGroupJsonOutputMapping(NodeGroupOutputMapping):
+
+    def get_output_value(self, stack):
+        for output in stack.to_dict().get('outputs', []):
+            if output['output_key'] == self.heat_output:
+                return output['output_value'][self.nodegroup_uuid]
+
+        LOG.warning('stack does not have output_key %s', self.heat_output)
         return None
 
 

@@ -1,0 +1,179 @@
+heat_template_version: queens
+
+parameters:
+  stack_name:
+    type: string
+  fixed_network:
+    type: string
+  fixed_subnet:
+    type: string
+  fixed_network_cidr:
+    type: string
+  dns_nameserver:
+    type: string
+  external_network:
+    type: string
+  loadbalancing_protocol:
+    type: string
+  kubernetes_port:
+    type: number
+  master_lb_enabled:
+    type: boolean
+  octavia_enabled:
+    type: boolean
+  master_lb_floating_ip_enabled:
+    type: boolean
+
+resources:
+
+  private_network:
+    condition: create_private_network
+    type: OS::Neutron::Net
+    properties:
+      name: { get_param: stack_name }
+
+  private_subnet:
+    condition: create_private_network
+    type: OS::Neutron::Subnet
+    properties:
+      name: { get_param: 'OS::stack_name' }
+      cidr: {get_param: fixed_network_cidr}
+      network: {get_resource: private_network}
+      dns_nameservers:
+        - {get_param: dns_nameserver}
+
+  extrouter:
+    condition: create_private_network
+    type: OS::Neutron::Router
+    properties:
+      name: { get_param: 'OS::stack_name' }
+      external_gateway_info:
+        network: {get_param: external_network}
+
+  extrouter_inside:
+    condition: create_private_network
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: {get_resource: extrouter}
+      subnet: {get_resource: private_subnet}
+
+  neutron_loadbalancer:
+    condition: create_neutron_lb
+    type: OS::Neutron::LBaaS::LoadBalancer
+    properties:
+      vip_subnet: { if: [ create_private_network, {get_attr: [network, fixed_subnet]}, {get_param: fixed_subnet} ] }
+
+  neutron_listener:
+    condition: create_neutron_lb
+    type: OS::Neutron::LBaaS::Listener
+    properties:
+      loadbalancer: {get_resource: neutron_loadbalancer}
+      protocol: {get_param: loadbalancing_protocol}
+      protocol_port: {get_param: kubernetes_port}
+
+  neutron_pool:
+    condition: create_neutron_lb
+    type: OS::Neutron::LBaaS::Pool
+    properties:
+      lb_algorithm: ROUND_ROBIN
+      listener: {get_resource: neutron_listener}
+      protocol: {get_param: loadbalancing_protocol}
+
+  neutron_monitor:
+    condition: create_neutron_lb
+    type: OS::Neutron::LBaaS::HealthMonitor
+    properties:
+      type: TCP
+      delay: 5
+      max_retries: 5
+      timeout: 5
+      pool: { get_resource: neutron_pool }
+
+  octavia_loadbalancer:
+    condition: create_octavia_lb
+    type: OS::Octavia::LBaaS::LoadBalancer
+    properties:
+      vip_subnet: { if: [ create_private_network, {get_attr: [network, fixed_subnet]}, {get_param: fixed_subnet} ] }
+
+  octavia_listener:
+    condition: create_octavia_lb
+    type: OS::Octavia::LBaaS::Listener
+    properties:
+      loadbalancer: {get_resource: octavia_loadbalancer}
+      protocol: {get_param: loadbalancing_protocol}
+      protocol_port: {get_param: kubernetes_port}
+
+  octavia_pool:
+    condition: create_octavia_lb
+    type: OS::Octavia::LBaaS::Pool
+    properties:
+      lb_algorithm: ROUND_ROBIN
+      listener: {get_resource: octavia_listener}
+      protocol: {get_param: loadbalancing_protocol}
+
+  octavia_monitor:
+    condition: create_octavia_lb
+    type: OS::Octavia::LBaaS::HealthMonitor
+    properties:
+      type: TCP
+      delay: 5
+      max_retries: 5
+      timeout: 5
+      pool: { get_resource: octavia_pool }
+
+  lb_floating_ip:
+    condition: create_lb_fip
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: {get_param: external_network}
+      port_id: {if: [ create_neutron_lb, {get_attr: [neutron_loadbalancer, vip_port_id]}, {get_attr: [octavia_loadbalancer, vip_port_id]} ] }
+
+conditions:
+  create_private_network: 
+    equals:
+    - get_param: fixed_network
+    - ""
+  create_lb:
+    equals:
+    - get_param: master_lb_enabled
+    - true
+  create_neutron_lb:
+    and:
+      - equals:
+        - get_param: master_lb_enabled
+        - true
+      - equals:
+        - get_para: octavia_enabled
+        - false
+  create_octavia_lb:
+    and:
+      - equals:
+        - get_param: master_lb_enabled
+        - true
+      - equals:
+        - get_para: octavia_enabled
+        - true
+  create_lb_fip:
+    and:
+      - equals:
+        - get_param: master_lb_floating_ip_enabled
+        - true
+      - equals:
+        - get_param: master_lb_enabled
+        - true
+
+outputs:
+  fixed_network:
+    value: {if: ["create_private_network", {get_resource: private_network}, {get_param: fixed_network} ]}
+
+  fixed_subnet:
+    value: {if: ["create_private_network", {get_resource: private_subnet}, {get_param: fixed_subnet} ] }
+
+  pool_id:
+    value: {if: ["create_lb", { if: ["create_neutron_lb",  {get_resource: neutron_pool}, {get_resource: octavia_pool} ] }, ""] }
+
+  lb_private_ip:
+    value: {if: ["create_lb", { if: ["create_neutron_lb", {get_attr: [neutron_loadbalancer, vip_address]}, {get_attr: [octavia_loadbalancer, vip_address]}]}, "" ] }
+
+  lb_floating_ip:
+    value: { if: ["create_lb_fip", {get_attr: [lb_floating_ip, floating_ip_address] }, ""] }
