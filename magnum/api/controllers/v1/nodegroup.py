@@ -14,6 +14,7 @@
 #    under the License.
 
 import pecan
+import uuid
 import wsme
 from wsme import types as wtypes
 
@@ -23,6 +24,7 @@ from magnum.api.controllers.v1 import collection
 from magnum.api.controllers.v1 import types
 from magnum.api import expose
 from magnum.api import utils as api_utils
+from magnum.common import exception
 from magnum.common import policy
 from magnum import objects
 
@@ -109,6 +111,15 @@ class NodeGroup(base.APIBase):
                                             cluster_path, nodegroup_path,
                                             bookmark=True)]
         return ng
+
+
+class NodeGroupPatchType(types.JsonPatchType):
+    _api_base = NodeGroup
+
+    @staticmethod
+    def internal_attrs():
+        internal_attrs = ['/node_addresses', '/role', '/is_default']
+        return types.JsonPatchType.internal_attrs() + internal_attrs
 
 
 class NodeGroupCollection(collection.Collection):
@@ -217,3 +228,92 @@ class NodeGroupController(base.Controller):
         cluster = api_utils.get_resource('Cluster', cluster_id)
         nodegroup = objects.NodeGroup.get(context, cluster.uuid, nodegroup_id)
         return NodeGroup.convert(nodegroup)
+
+    @expose.expose(NodeGroup, types.uuid_or_name, NodeGroup, body=NodeGroup,
+                   status_code=201)
+    def post(self, cluster_id, nodegroup):
+        """Create NodeGroup.
+
+        :param nodegroup: a json document to create this NodeGroup.
+        """
+
+        context = pecan.request.context
+        policy.enforce(context, 'nodegroup:create', action='nodegroup:create')
+
+        cluster = api_utils.get_resource('Cluster', cluster_id)
+
+        if not nodegroup.image_id:
+            nodegroup.image_id = cluster.cluster_template.image_id
+        if not nodegroup.flavor_id:
+            nodegroup.flavor_id = cluster.flavor_id
+
+        # set this to minion explicitly
+        nodegroup.role = "minion"
+
+        nodegroup_dict = nodegroup.as_dict()
+        nodegroup_dict['cluster'] = cluster
+        nodegroup_dict['cluster_id'] = cluster.uuid
+        nodegroup_dict['project_id'] = context.project_id
+        nodegroup_dict['user_id'] = context.user_id
+        nodegroup_dict['coe_version'] = cluster.coe_version
+        nodegroup_dict['container_version'] = cluster.container_version
+
+        new_obj = objects.NodeGroup(context, **nodegroup_dict)
+        new_obj.uuid = uuid.uuid4()
+        pecan.request.rpcapi.nodegroup_create_async(cluster, new_obj)
+        return NodeGroup.convert(new_obj)
+
+    @expose.expose(NodeGroup, types.uuid_or_name, types.uuid_or_name,
+                   body=[NodeGroupPatchType], status_code=202)
+    def patch(self, cluster_id, nodegroup_id, patch):
+        """Update NodeGroup.
+
+        :param cluster_id: cluster id.
+        :param : resource name.
+        :param values: a json document to update a nodegroup.
+        """
+        cluster = api_utils.get_resource('Cluster', cluster_id)
+        nodegroup = self._patch(cluster.uuid, nodegroup_id, patch)
+        pecan.request.rpcapi.nodegroup_update_async(cluster, nodegroup)
+        return NodeGroup.convert(nodegroup)
+
+    @expose.expose(None, types.uuid_or_name, types.uuid_or_name,
+                   status_code=204)
+    def delete(self, cluster_id,  nodegroup_id):
+        """Delete NodeGroup for a given project_id and resource.
+
+        :param cluster_id: cluster id.
+        :param nodegroup_id: resource name.
+        """
+        context = pecan.request.context
+        policy.enforce(context, 'nodegroup:delete', action='nodegroup:delete')
+        cluster = api_utils.get_resource('Cluster', cluster_id)
+        nodegroup = objects.NodeGroup.get(context, cluster.uuid, nodegroup_id)
+        if nodegroup.is_default:
+            raise exception.DeletingDefaultNGNotSupported()
+        pecan.request.rpcapi.nodegroup_delete_async(cluster, nodegroup)
+
+    def _patch(self, cluster_uuid, nodegroup_id, patch):
+        context = pecan.request.context
+        policy.enforce(context, 'nodegroup:update', action='nodegroup:update')
+        nodegroup = objects.NodeGroup.get(context, cluster_uuid, nodegroup_id)
+
+        try:
+            ng_dict = nodegroup.as_dict()
+            new_nodegroup = NodeGroup(**api_utils.apply_jsonpatch(ng_dict,
+                                                                  patch))
+        except api_utils.JSONPATCH_EXCEPTIONS as e:
+            raise exception.PatchError(patch=patch, reason=e)
+
+        # Update only the fields that have changed
+        for field in objects.NodeGroup.fields:
+            try:
+                patch_val = getattr(new_nodegroup, field)
+            except AttributeError:
+                # Ignore fields that aren't exposed in the API
+                continue
+            if patch_val == wtypes.Unset:
+                patch_val = None
+            if nodegroup[field] != patch_val:
+                nodegroup[field] = patch_val
+        return nodegroup
