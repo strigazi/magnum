@@ -172,5 +172,5 @@ cat >> /etc/environment <<EOF
 KUBERNETES_MASTER=$KUBE_MASTER_URI
 EOF
 
-${ssh_cmd} hostname `hostname | sed 's/.novalocal//'`
+${ssh_cmd} "hostname \$(hostname | sed 's/.novalocal//')"
 ${ssh_cmd} systemctl start docker kubelet kube-proxy --no-block

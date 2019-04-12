@@ -588,9 +588,64 @@ parameters:
     type: boolean
     default: true
  
-  dummy_param:
-    type: number
-    default: 0
+  keystone_auth_enabled:
+    type: boolean
+    description: >
+      true if the keystone authN and authZ should be enabled
+    default:
+      true
+
+  k8s_keystone_auth_tag:
+    type: string
+    description: tag of the k8s_keystone_auth container
+    default: 1.13.0
+
+  monitoring_enabled:
+    type: boolean
+    description: Enable or disable prometheus-operator monitoring solution.
+    default: false
+
+  project_id:
+    type: string
+    description: >
+      project id of current project
+
+  tiller_enabled:
+    type: boolean
+    description: Choose whether to install tiller or not.
+    default: false
+
+  tiller_tag:
+    type: string
+    description: tag of tiller container
+    default: "v2.12.3"
+
+  tiller_namespace:
+    type: string
+    description: namespace where tiller will be installed.
+    default: "magnum-tiller"
+
+  node_problem_detector_tag:
+    type: string
+    description: tag of the node problem detector container
+    default: v0.6.2
+
+  flannel_cni_tag:
+    type: string
+    description: tag of the flannel cni container
+    default: v0.3.0
+
+  cloud_provider_tag:
+    type: string
+    description:
+      tag of the kubernetes/cloud-provider-openstack
+      https://hub.docker.com/r/k8scloudprovider/openstack-cloud-controller-manager/tags/
+    default: v0.2.0
+
+  cloud_provider_enabled:
+    type: boolean
+    description: Enable or disable the openstack kubernetes cloud provider
+    default: true
 
 resources:
 
@@ -763,21 +818,132 @@ resources:
          - "\n"
          -
            - str_replace:
+               template: {get_file: ../scripts/write-heat-params-master.sh}
+               params:
+                 "$PROMETHEUS_MONITORING": {get_param: prometheus_monitoring}
+                 #"$KUBE_API_PUBLIC_ADDRESS": {get_attr: [api_address_switch, public_ip]}
+                 #"$KUBE_API_PRIVATE_ADDRESS": {get_attr: [api_address_switch, private_ip]}
+                 "$KUBE_API_PORT": {get_param: kubernetes_port}
+                 #"$KUBE_NODE_PUBLIC_IP": {get_attr: [kube_master_floating, floating_ip_address]}
+                 #"$KUBE_NODE_IP": {get_attr: [kube_master_eth0, fixed_ips, 0, ip_address]}
+                 #"$KUBE_ALLOW_PRIV": {get_param: kube_allow_priv}
+                 #"$ETCD_VOLUME": {get_resource: etcd_volume}
+                 #"$ETCD_VOLUME_SIZE": {get_param: etcd_volume_size}
+                 #"$DOCKER_VOLUME": {get_resource: docker_volume}
+                 #"$DOCKER_VOLUME_SIZE": {get_param: docker_volume_size}
+                 #"$DOCKER_STORAGE_DRIVER": {get_param: docker_storage_driver}
+                 "$CGROUP_DRIVER": {get_param: cgroup_driver}
+                 "$NETWORK_DRIVER": {get_param: network_driver}
+                 "$FLANNEL_NETWORK_CIDR": {get_param: flannel_network_cidr}
+                 "$FLANNEL_NETWORK_SUBNETLEN": {get_param: flannel_network_subnetlen}
+                 "$FLANNEL_BACKEND": {get_param: flannel_backend}
+                 "$SYSTEM_PODS_INITIAL_DELAY": {get_param: system_pods_initial_delay}
+                 "$SYSTEM_PODS_TIMEOUT": {get_param: system_pods_timeout}
+                 "$PODS_NETWORK_CIDR": {get_param: pods_network_cidr}
+                 "$PORTAL_NETWORK_CIDR": {get_param: portal_network_cidr}
+                 "$ADMISSION_CONTROL_LIST": {get_param: admission_control_list}
+                 #"$ETCD_DISCOVERY_URL": {get_param: discovery_url}
+                 "$AUTH_URL": {get_param: auth_url}
+                 "$USERNAME": {get_param: username}
+                 "$PASSWORD": {get_param: password}
+                 "$CLUSTER_SUBNET": {get_param: fixed_subnet}
+                 "$TLS_DISABLED": {get_param: tls_disabled}
+                 "$KUBE_DASHBOARD_ENABLED": {get_param: kube_dashboard_enabled}
+                 "$INFLUX_GRAFANA_DASHBOARD_ENABLED": {get_param: influx_grafana_dashboard_enabled}
+                 "$VERIFY_CA": {get_param: verify_ca}
+                 "$CLUSTER_UUID": {get_param: cluster_uuid}
+                 "$MAGNUM_URL": {get_param: magnum_url}
+                 "$VOLUME_DRIVER": {get_param: volume_driver}
+                 "$REGION_NAME": {get_param: region_name}
+                 "$HTTP_PROXY": {get_param: http_proxy}
+                 "$HTTPS_PROXY": {get_param: https_proxy}
+                 "$NO_PROXY": {get_param: no_proxy}
+                 "$KUBE_TAG": {get_param: kube_tag}
+                 "$CLOUD_PROVIDER_TAG": {get_param: cloud_provider_tag}
+                 "$CLOUD_PROVIDER_ENABLED": {get_param: cloud_provider_enabled}
+                 "$ETCD_TAG": {get_param: etcd_tag}
+                 "$FLANNEL_TAG": {get_param: flannel_tag}
+                 "$FLANNEL_CNI_TAG": {get_param: flannel_cni_tag}
+                 "$KUBE_VERSION": {get_param: kube_version}
+                 "$KUBE_DASHBOARD_VERSION": {get_param: kube_dashboard_version}
+                 "$TRUSTEE_USER_ID": {get_param: trustee_user_id}
+                 "$TRUSTEE_PASSWORD": {get_param: trustee_password}
+                 "$TRUST_ID": {get_param: trust_id}
+                 "$INSECURE_REGISTRY_URL": {get_param: insecure_registry_url}
+                 "$CONTAINER_INFRA_PREFIX": {get_param: container_infra_prefix}
+                 #"$ETCD_LB_VIP": {get_param: etcd_lb_vip}
+                 "$DNS_SERVICE_IP": {get_param: dns_service_ip}
+                 "$DNS_CLUSTER_DOMAIN": {get_param: dns_cluster_domain}
+                 "$CERT_MANAGER_API": {get_param: cert_manager_api}
+                 "$CA_KEY": {get_param: ca_key}
+                 "$CALICO_TAG": {get_param: calico_tag}
+                 "$CALICO_CNI_TAG": {get_param: calico_cni_tag}
+                 "$CALICO_KUBE_CONTROLLERS_TAG": {get_param: calico_kube_controllers_tag}
+                 "$CALICO_IPV4POOL": {get_param: calico_ipv4pool}
+                 "$INGRESS_CONTROLLER": {get_param: ingress_controller}
+                 "$INGRESS_CONTROLLER_ROLE": {get_param: ingress_controller_role}
+                 "$OCTAVIA_INGRESS_CONTROLLER_TAG": {get_param: octavia_ingress_controller_tag}
+                 "$KUBELET_OPTIONS": {get_param: kubelet_options}
+                 "$KUBEAPI_OPTIONS": {get_param: kubeapi_options}
+                 "$KUBECONTROLLER_OPTIONS": {get_param: kubecontroller_options}
+                 "$KUBEPROXY_OPTIONS": {get_param: kubeproxy_options}
+                 "$KUBESCHEDULER_OPTIONS": {get_param: kubescheduler_options}
+                 "$OCTAVIA_ENABLED": {get_param: octavia_enabled}
+                 "$KUBE_SERVICE_ACCOUNT_KEY": {get_param: kube_service_account_key}
+                 "$KUBE_SERVICE_ACCOUNT_PRIVATE_KEY": {get_param: kube_service_account_private_key}
+                 "$PROMETHEUS_TAG": {get_param: prometheus_tag}
+                 "$GRAFANA_TAG": {get_param: grafana_tag}
+                 "$HEAT_CONTAINER_AGENT_TAG": {get_param: heat_container_agent_tag}
+                 "$KEYSTONE_AUTH_ENABLED": {get_param: keystone_auth_enabled}
+                 "$K8S_KEYSTONE_AUTH_TAG": {get_param: k8s_keystone_auth_tag}
+                 "$MONITORING_ENABLED": {get_param: monitoring_enabled}
+                 "$PROJECT_ID": {get_param: project_id}
+                 "$EXTERNAL_NETWORK_ID": {get_param: external_network}
+                 "$TILLER_ENABLED": {get_param: tiller_enabled}
+                 "$TILLER_TAG": {get_param: tiller_tag}
+                 "$TILLER_NAMESPACE": {get_param: tiller_namespace}
+                 "$NODE_PROBLEM_DETECTOR_TAG": {get_param: node_problem_detector_tag}
+           - str_replace:
                template: {get_file: ../../common/templates/kubernetes/fragments/enable-cert-api-manager.sh}
                params:
                  "$CA_KEY": {get_param: ca_key}
+           #- get_file: ../../common/templates/kubernetes/fragments/kube-apiserver-to-kubelet-role.sh
+           #- get_file: ../../common/templates/kubernetes/fragments/core-dns-service.sh
+           #- str_replace:
+           #    template: {get_file: ../../common/templates/kubernetes/fragments/enable-prometheus-monitoring.sh}
+           #    params:
+           #      "$ADMIN_PASSWD": {get_param: grafana_admin_passwd}
+           #- get_file: ../../common/templates/kubernetes/fragments/calico-service.sh
+           #- get_file: ../../common/templates/kubernetes/fragments/flannel-service.sh
+           #- str_replace:
+           #    params:
+           #      $enable-ingress-traefik: {get_file: ../../common/templates/kubernetes/fragments/enable-ingress-traefik.sh}
+           #    template: {get_file: ../../common/templates/kubernetes/fragments/enable-ingress-controller.sh}
+           #- get_file: ../../common/templates/kubernetes/fragments/kube-dashboard-service.sh
            - get_file: ../../common/templates/kubernetes/fragments/kube-apiserver-to-kubelet-role.sh
            - get_file: ../../common/templates/kubernetes/fragments/core-dns-service.sh
+           - get_file: ../../common/templates/kubernetes/fragments/calico-service.sh
+           - get_file: ../../common/templates/kubernetes/fragments/flannel-service.sh
+           - get_file: ../../common/templates/kubernetes/fragments/enable-helm-tiller.sh
            - str_replace:
                template: {get_file: ../../common/templates/kubernetes/fragments/enable-prometheus-monitoring.sh}
                params:
                  "$ADMIN_PASSWD": {get_param: grafana_admin_passwd}
-           - get_file: ../../common/templates/kubernetes/fragments/calico-service.sh
            - str_replace:
                params:
                  $enable-ingress-traefik: {get_file: ../../common/templates/kubernetes/fragments/enable-ingress-traefik.sh}
+                 $enable-ingress-octavia: {get_file: ../../common/templates/kubernetes/fragments/enable-ingress-octavia.sh}
                template: {get_file: ../../common/templates/kubernetes/fragments/enable-ingress-controller.sh}
            - get_file: ../../common/templates/kubernetes/fragments/kube-dashboard-service.sh
+           - get_file: ../../common/templates/kubernetes/fragments/enable-keystone-auth.sh
+           - get_file: ../../common/templates/kubernetes/fragments/enable-auto-healing.sh
+           # Helm Based Installation Configuration Scripts
+           - get_file: ../../common/templates/kubernetes/helm/metrics-server.sh
+           - str_replace:
+               template: {get_file:  ../../common/templates/kubernetes/helm/prometheus-operator.sh}
+               params:
+                 "${ADMIN_PASSWD}": {get_param: grafana_admin_passwd}
+           - get_file: ../../common/templates/kubernetes/fragments/install-helm-modules.sh
 
   kube_cluster_deploy:
     type: OS::Heat::SoftwareDeployment
