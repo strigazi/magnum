@@ -1,7 +1,10 @@
-#!/bin/sh -x
+#!/bin/sh
 
-ssh_cmd="ssh -F /srv/magnum/.ssh/config root@localhost"
+set +x
 . /etc/sysconfig/heat-params
+set -x
+set -e
+ssh_cmd="ssh -F /srv/magnum/.ssh/config root@localhost"
 
 echo "configuring kubernetes (minion)"
 
@@ -16,6 +19,11 @@ fi
 if [ ! -z "$NO_PROXY" ]; then
     export NO_PROXY
 fi
+
+sed -i '
+    /^KUBE_ALLOW_PRIV=/ s/=.*/="--allow-privileged='"$KUBE_ALLOW_PRIV"'"/
+    /^KUBE_MASTER=/ s|=.*|=|
+' /etc/kubernetes/config
 
 CERT_DIR=/etc/kubernetes/certs
 PROTOCOL=https
@@ -88,10 +96,6 @@ fi
 
 chmod 0644 ${KUBELET_KUBECONFIG}
 chmod 0644 ${PROXY_KUBECONFIG}
-
-sed -i '
-    /^KUBE_MASTER=/ s|=.*|="--master='"$KUBE_MASTER_URI"'"|
-' /etc/kubernetes/config
 
 # NOTE:  Kubernetes plugin for Openstack requires that the node name registered
 # in the kube-apiserver be the same as the Nova name of the instance, so that
@@ -166,10 +170,6 @@ sed -i '
 
 cat > /etc/kubernetes/proxy << EOF
 KUBE_PROXY_ARGS="--kubeconfig=${PROXY_KUBECONFIG} --cluster-cidr=${PODS_NETWORK_CIDR}"
-EOF
-
-cat >> /etc/environment <<EOF
-KUBERNETES_MASTER=$KUBE_MASTER_URI
 EOF
 
 ${ssh_cmd} "hostname \$(hostname | sed 's/.novalocal//')"

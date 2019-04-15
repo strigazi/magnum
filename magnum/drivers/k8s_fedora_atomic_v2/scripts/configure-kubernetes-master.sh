@@ -30,7 +30,6 @@ ${ssh_cmd} atomic install --storage ostree --system --system-package=no --name=k
 CERT_DIR=/etc/kubernetes/certs
 
 sed -i '
-    /^KUBE_ALLOW_PRIV=/ s/=.*/="--allow-privileged='"$KUBE_ALLOW_PRIV"'"/
     /^KUBE_MASTER=/ s|=.*|="--master=http://127.0.0.1:8080"|
 ' /etc/kubernetes/config
 
@@ -135,3 +134,7 @@ sed -i '
 
 sed -i '/^KUBE_SCHEDULER_ARGS=/ s/=.*/="--leader-elect=true"/' /etc/kubernetes/scheduler
 
+cat >> /etc/kubernetes/kubelet <<EOF
+KUBELET_ARGS="\${KUBELET_ARGS} --register-with-taints=CriticalAddonsOnly=True:NoSchedule,dedicated=master:NoSchedule"
+KUBELET_ARGS="\${KUBELET_ARGS} --node-labels=node-role.kubernetes.io/master="
+EOF
